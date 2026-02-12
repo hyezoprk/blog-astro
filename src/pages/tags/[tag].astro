@@ -1,7 +1,6 @@
 ---
 import { getAllTags, getSortedPostsData } from '../../lib/posts';
 import Layout from '../../components/layout/Layout.astro';
-import CommandPalette from '../../components/navigation/CommandPalette';
 import TagPageClient from '../../components/tags/TagPageClient';
 import '../../styles/global.css';
 
@@ -27,17 +26,7 @@ const postsData = posts.map(p => ({
 }));
 ---
 
-<html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  </head>
-  <body>
-    <CommandPalette client:load>
-      <Layout tag siteTitle={`${tag} 〰 혜조로그`}>
-        <h1 class="pl-4 pt-16">{tag}</h1>
-        <TagPageClient client:load posts={postsData} tag={tag} />
-      </Layout>
-    </CommandPalette>
-  </body>
-</html>
+<Layout tag siteTitle={`${tag} 〰 혜조로그`}>
+  <h1 class="pl-4 pt-16">{tag}</h1>
+  <TagPageClient client:load posts={postsData} tag={tag} />
+</Layout>

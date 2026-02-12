@@ -1,0 +1,86 @@
+---
+title: 트랜잭션
+date: "2023-11-30"
+categories: coding
+tags: "네스트"
+description: "15"
+---
+
+<HeadingNavigator />
+
+### 트랜잭션
+<small>Transaction</small>
+로직을 처리할 때 이런 경우가 있다
+- A 함수와 B 함수를 연달아 실행시키는데
+- A 함수가 성공하고 B 함수는 실패하여 에러를 던진 경우,
+- 그럴 때 A 함수의 로직은 취소되거나 일어나지 말았어야 하는 것이 된다.
+
+이렇듯 모든 로직이 성공했을 때만 로직의 진행을 패스시키는 테크닉?을 트랜잭션이라 부른다. 트랜잭션은 세 개의 포인트를 가진다.
+- Start: 묶음 로직의 시작
+- Commit: 저장
+- Rollback: 원상복구
+
+이게 필요한 이유/상황은..
+1. 가령 이미지를 `temp`에서 스토리지로 이동시키는 함수 그리고 포스트를 최종 발행하는 함수가 연달아 실행된다고 하자.
+2. 이미지 폴더를 스토리지로 옮기는 데는 성공했지만 최종 발행은 모종의 이유로 실패한 경우, 이미지는 미아가 된다.
+3. 그래서 두 함수가 항상 같이 죽고 같이 살도록 트랜잭션으로 묶어야 한다.
+
+### 트랙잭션 시작
+- 트랜잭션이 필요한 컨트롤러에서 `DataSources`를 주입받는다.
+```ts posts.service.ts
+@Controller('posts')
+export class PostsController {
+  constructor(
+    private readonly postsService: PostsService,
+    // focus
+    private readonly dataSource: DataSource,
+  ) {}
+}
+```
+- `DataSources`는 `createQueryRunner()` 메소드를 가지고 있다. 트랙잭션과 관련된 모든 쿼리를 처리하는 쿼리 러너를 생성한다.
+- `qr.connect()`로 쿼리러너에 연결한다.
+- `qr.startTransaction()`을 호출한 시점부터 트랜잭션이 시작된다. 이 시점부터 같은 쿼리 러너를 사용하면 트랜잭션에 묶인다. 
+- 묶을 로직들을 모아준다.
+```ts posts.service.ts
+@Controller('posts')
+export class PostsController {
+  constructor(
+    private readonly postsService: PostsService,
+    private readonly dataSource: DataSource,
+  ) {}
+
+  const qr = this.dataSource.createQueryRunner();
+
+  await qr.connect();
+  await qr.startTransaction();
+
+  try {
+    const post = await this.postsService.createPost(userId, body, qr);
+  
+    for (let i = 0; i < body.images.length; i++) {
+      await this.postsImagesService.createPostImage(
+        {
+          post,
+          order: i,
+          path: body.images[i],
+          type: ImageModelType.POST,
+        },
+        qr,
+      );
+    }
+    
+    await qr.commitTransaction();
+    await qr.release();
+    return this.postsService.getPostById(post.id, qr);
+  } catch(e) {
+    await qr.rollbackTransaction();
+    await qr.release();
+  }
+}
+```
+- 모든 함수들이 같은 qr에 연결될 수 있도록 파라미터로 넣어준다.
+- qr을 전달받은 함수들은 `qr.manager`를 통해 리포지토리를 생성한다.
+- 이 리포지토리로 수행하는 DB 액션은 모두 쿼리러너, 즉 트랜잭션에 묶인다.
+- 위 예에서 각각의 함수는 `qr.manager.getRepository(엔티티)`로 작업을 수행한다.
+- 에러없이 로직이 흘렀다면 `qr.commitTransaction()`으로 트랜잭션을 승인하고 `release()`로 빠져나온다.
+- 에러가 발생했다면 `qr.rollbackTransaction()`으로 트랜잭션을 취소하고 `release()`로 빠져나온다.

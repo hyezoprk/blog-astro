@@ -1,0 +1,25 @@
+---
+title: 리터럴 템플릿과 as const
+date: '2023-12-06'
+categories: coding
+tags: 타입스크립트
+description: feat
+series: "Total TS"
+---
+<HeadingNavigator />
+
+> <figcaption>(Matt Pocock의 강의[^1]를 정리한 시리즈입니다.)</figcaption>
+
+### as const
+
+as const는 주로 배열을 `readonly`로 만들어 고정시킬 때 사용했다. 그런데 이를 리터럴 템플릿에 적용하면 다소 신기한 결과가 나온다
+<Img src='/images/2023/typescript/literal as const.png' />
+
+기존에 `String` 타입이었던 값이 변수 부분만 `String`으로 남고, 나머지는 리터럴 템플릿의 내용을 그대로 추론해 가져온다. 
+
+타입을 디테일하게 작성할 때 요긴하게 쓰일 것 같다!
+
+<br/>
+---
+#### 참고자료
+[^1]: <Lnk text='Total typescript' href='https://www.youtube.com/@mattpocockuk' />

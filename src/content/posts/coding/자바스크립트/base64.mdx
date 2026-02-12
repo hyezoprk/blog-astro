@@ -1,0 +1,76 @@
+---
+title: "Base64 인코딩 심층 탐구"
+date: '2023-12-05'
+categories: coding
+tags: 자바스크립트
+description: JWT
+series: auth
+pinned: true
+---
+<HeadingNavigator />
+
+### Base64 인코딩
+
+Base64 인코딩은 바이너리 코드를 일련의 ASCII 문자열로 나타내는 인코딩 방식이다.
+
+라는 설명을 보면서 사실 크게 와닿지 않았다. 바이너리 코드를 인코딩하는 건 알겠는데, 왜 로그인 과정에서 `Basic $token`을 인코딩할 때 쓰이는 것이지? 텍스트를 왜 또 텍스트로 변환하지? 당최 이해가 안 갔다. 그래서 공부한 내용을 이 포스트에 담았다. 저 말은 미리 이렇게 부연돼야 하리라.
+
+> Base64 인코딩은 8비트 이상의 텍스트 및 바이너리 데이터를 6비트 텍스트 형식으로 나타내는 인코딩 방식을 의미한다.
+
+근데 왜 이게 필요했을까?
+
+### Base64 인코딩의 필요성
+
+네트워크를 통해 전송되는 데이터는 바이너리(binary large object file, BLOB)형과 문자(character large object file, CLOB)형으로 나뉜다. 그래서 텍스트 형식의 프로토콜(xml, http, json)에 바이너리 형 데이터를 불러올 때 이를 텍스트 형으로 인코딩해야 함은 일견 상식적으로 납득이 간다. 하지만 텍스트를 텍스트로 인코딩하는 건? 앞서도 말했지만 이 경우 나에겐 좀 더 세심한 설명이 필요했다. 인코딩이 고도의 암호화도 아니면서 왜 이런 작업을 필요로 할까? 대부분 관습적으로 그 일을 처리하는 거 같았고 나는 궁금했다.
+
+그 이유를 찾다 이런 답을 보았다. 80년대에는 7비트 통신이 일반적이어서 8비트 이상의 바이너리 데이터는 전송할 수 없었다고 한다[^1]. 그래서 바이너리 데이터를 6비트로 인코딩하는 `base64`란 매개가 꼭 필요했다. 그러던 것이 어느 순간 확장 아스키 코드(8비트)가 나오면서 그의 인코딩에도 사용된 것으로 보인다. 이 과정을 겪으면 1/3 가량 부피는 늘어나게 되지만 어쨌든 전송될 수 있는 것이 중요한 거 아니겠는가.
+그리고 시대가 바뀌어 이제는 8비트 통신이 표준이 되었다. 하지만 그 관성이 여전히 작용되고 있는 것 같다.
+
+> <label className="green" />
+> **BLOP과 CLOP**
+> BLOB은 일반적으로 이미지, 오디오 또는 비디오의 바이너리 데이터를, CLOB은 텍스트 데이터(xml, json, html 등)를 의미한다. 이 둘은 모두 궁극적으로 이진 코드로 받아들여지지만, 텍스트 데이터는 처음엔 사람이 읽을 수 있도록 설계됐다는 점에서 차별성을 갖는다.
+
+### Base64 인코딩의 원리
+<Youtube src='https://www.youtube.com/embed/8qkxeZmKmOY' />
+<figcaption>What is Base64?</figcaption>
+<br/>
+
+먼저, 컴퓨터는 아스키 코드를 8비트의 이진 코드로 받아들인다. `Base64`가 개입하는 것은 이 부분이다. `Base64`는 이를 가만두는 대신 6비트 단위로 재조합한다. 그러면 3개의 8비트 덩어리는(3개의 글자는) 4개의 6비트 덩어리(4개의 글자)로 바뀌게 된다. 이것이 인코딩 후 1/3가량 부피를 더 차지하는 이유다.
+이렇게 재조립된 코드는 이제 아스키 테이블이 아니라 일종의 간소화된 아스키 테이블인 base64 테이블을 따른다. 이는 64개의 문자(10개의 숫자, 26개의 대문자, 26개의 소문자, +, /)로 이루어져 있다.[^2]
+
+> <label className="green" />
+> 인코딩은 3의 배수마다 하나의 글자가 더 생기는 것으로 맞아 떨어진다. 그래서 3으로 나눠 1이 남을 때, 2가 남을 때는 6비트 덩이가 형성되지 않아 코드가 애매하게 남는다. 이때 남는 공백은 `00`으로 충당한 뒤 끝에 `=` 표시를 붙인다. 4비트의 공백을 채웠다면 `0000==`이 붙게 되는 식이다.
+
+> <label className="red" />
+> 그런데 base64Encoding에는 소소한 문제가 있다. 아스키 코드의 변환에 초점이 맞춰져 있어서 한글을 만나면 제대로 처리하지 못하는 문제가 있다. `Exception: Character Out Of Range`.
+> 그런데 아이디가 한글인 서비스면 어떻게 하나? 고객이 한글 암호를 요구하면? 다행히 이 문제에 대해선 [MDN](https://developer.mozilla.org/en-US/docs/Glossary/Base64#the_unicode_problem)에 해답이 올라와 있다.
+> <br/>
+> "The simplest solution is to use TextEncoder and TextDecoder to convert between UTF-8 and single-byte representations of the string"
+> <cite>The "Unicode Problem"</cite>
+
+### Base64 인코딩하는 방법
+- 자바스크립트
+  - 전역 메서드로 `btoa()`와 `atob()`를 제공하고 있다.
+	- legacy: Buffer.from(plainString).toString('base64')
+	- 현재: `btoa(plainString)` / 디코드는 `atob(base64String)`
+
+> <label className="green" />
+> `btoa`의 의미를 base64 to ascii로 이해하면 곤란하다. 정반대의 결과를 낳는 함수이기 때문이다. 자바스크립트를 만든 개발자에 따르면 `btoa`는 binary to ascii의 약자로, base64 인코딩을 의미한다[^3]. 사실 좀 헷갈리는데 base64의 주용도가 바이너리 데이터를 텍스트 데이터로 변환하는 것임을 기억하면 바로 이해된다.
+
+- 다트
+  - base64를 점화시킬 코덱을 만든다.
+  - 만들어진 코덱의 `encode()` 메서드를 사용한다.
+  ```dart
+  plainToBase64(String plain) {
+    Codec<String, String> stringToBase64 = utf8.fuse(base64);
+    String token = stringToBase64.encode(plain);
+
+    return token;
+  }
+  ```
+
+<br/>
+#### 참고자료
+[^1]: <Lnk text='Base64 Encoding: What Is It? How Does It Work?' href='https://builtin.com/software-engineering-perspectives/base64-encoding' />
+[^2]: <Lnk text='Base64 Table' href='https://en.wikipedia.org/wiki/Base64#Base64_table_from_RFC_4648' />
+[^3]: <Lnk text='Why were Javascript `atob()` and `btoa()` named like that?' href='https://stackoverflow.com/a/50454071' />

@@ -1,0 +1,28 @@
+---
+title: recoil 중복키 해결
+date: "2022-09-26"
+categories: project
+tags: ["블로그 포트폴리오", "에러픽스"]
+description: 프론트
+---
+
+블로그는 여태 `props`와 `getStaticProps`로만 작업을 해왔다. 그러던 차 타이틀 네비게이터 구현하면서 전역 state가 필요해진 순간이 왔다  
+리덕스는 내게 지저분한 기억이라 리코일을 봤는데, 형태가 눈에 익어 맘에 들었다. 복잡한 기능 쓸 건 아니었기 때문에 5분 정도 눈팅하고 초기값, setState하고 넘어갔다. 그런데...
+
+<Img src={'/images/에러/스샷_리코일1.webp'} />
+<Img src={'/images/에러/스샷_리코일2.webp'} />
+<br/>
+이런 에러가 떴다.
+<Img src={'/images/에러/스샷_리코일4.webp'} />
+<br/>
+찾아보니 아톰키가 고유값이어야 하는데, 개발 중 코드 수정으로 인해 페이지가 refresh 될 때 변수가 겹치는 순간이 있다고 한다(next.js).  
+해결법은 아톰키 뒤에 난수를 부여해주는 것이다[^1]. 이럴 때 통상 <q>uuid</q>를 쓰는 걸로 알고 있는데 나는 <q>lodash</q>에도 비슷한 게 있길래 `uniqueId( )` 함수로 해결했다.   
+<br/>
+<Img src={'/images/에러/스샷_리코일3.webp'} />
+<br/>
+<br/>
+
+숙제: <Lnk text={'리코일 공홈'} href={'https://recoiljs.org/docs/basic-tutorial/intro'} /> 정독. 한글도 있는데 그냥 영어로 보는 게 나은 거 같다
+<br/>
+#### 참고한 사이트
+[^1]: <Lnk text={'sj_dev_js 브이로그'} href={'https://velog.io/@sj_dev_js/Recoil-Duplicate-atom-key'} />

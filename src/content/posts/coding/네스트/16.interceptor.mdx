@@ -1,0 +1,110 @@
+---
+title: 인터셉터
+date: "2023-12-01"
+categories: coding
+tags: "네스트"
+description: "16"
+---
+
+<HeadingNavigator />
+
+### 인터셉터
+<small>Interceptor</small>
+
+인터셉터는 NestJS의 라이프사이클 중 요청과 응답을 모두 핸들링할 수 있는 귀한 장치다. 들어오는 요청, 나가는 요청을 모두 캐치하기에 그만의 기능을 수행할 수 있는 장소다.
+기본적으로 로거를 생각할 수 있겠다.
+
+
+### 로거 구현
+- 인터셉터는 `NestInterceptor` 인터페이스를 따른다.
+- 자동완성에 의해 `context`, `next` 아규먼트가 주입된다.
+- 로거를 만들어본다.
+  - 요청이 들어올 때 Req가 들어온 타임스탬프를 찍는다.
+  - 응답이 나갈 때 Res가 나가는 타임스탬프를 찍는다.
+  ```ts
+  @Injectable()
+  export class LogInterceptor implements NestInterceptor {
+    intercept(context: ExecutionContext, next: CallHandler<any>): Observable<any> {
+      const req = context.switchToHttp().getRequest();
+      const path = req.originalUrl;
+      const now = new Date();
+
+      console.log(`[REQ] ${path} ${now.toLocaleString('kr')}`);
+
+      return next.handle()
+      .pipe(
+        tap((observable) => console.log(`[RES] ${path} ${new Date().toLocaleString('kr')} ${new Date().getMilliSeconds() - now.getMilliSeconds()ms`)),
+        map((observable) => {
+          return {
+            message: '응답 하이재킹',
+            response: observable,
+          }
+        })
+      )
+    }
+  }
+  ```
+- 요청이 들어올 때 `intercept`가 실행되며 함수의 바디가 실행된다.
+- 요청이 들어올 땐 리턴값이 실행되지 않는다. `next.handle()`은 응답이 나갈 때 실행된다.
+- `next.handle()`에는 파이프라인을 연결할 수 있다.
+- `tap`은 응답값을 조회만 할 수 있고, `map`은 응답값을 변경할 수 있다.
+- 이 둘이 받고 있는 첫번째 아규먼트 `observable`은 응답하여 나가는 원래의 값이 들어있다.
+- `tap`을 사용하여 이를 조회하거나, `map`을 사용하여 이 값을 조작하여 반환할 수 있다.
+
+### 트랜잭션 인터셉션
+- 인터셉터의 특성을 활용하기 좋은 예가 앞서 봤던 쿼리러너다.
+- 요청이 들어올 때 쿼리러너를 열어주고, 로직을 수행한 후, 나갈 때 자동으로 닫히는 인터셉션을 만들 수 있다.
+  ```ts
+  @Injectable()
+  export class TransactionInterceptor implements NestInterceptor {
+    constructor(private readonly dataSource: DataSource) {}
+
+    async intercept(
+      context: ExecutionContext,
+      next: CallHandler<any>,
+    ): Promise<Observable<any>> {
+      const req = context.switchToHttp().getRequest();
+      const qr = this.dataSource.createQueryRunner();
+
+      await qr.connect();
+      await qr.startTransaction();
+      req.qr = qr;
+
+      return next.handle().pipe(
+        catchError(async (e: Error) => {
+          await qr.rollbackTransaction();
+          await qr.release();
+
+          throw new InternalServerErrorException(e.message);
+        }),
+        tap(async (res) => {
+          await qr.commitTransaction();
+          await qr.release();
+        }),
+      );
+    }
+  }
+  ```
+- 요청이 들어오면 쿼리러너를 열고 시작한다. 그 직후, `req` 객체에 이를 저장하여 다른 곳에서도 사용할 수 있도록 한다.
+- 응답시에는 쿼리러너늘 커밋하고 닫는다. 실패할 경우엔 롤백이 발동되도록 분기 처리한다.
+
+### 커스텀 데코레이터로 갈무리
+- 위에서 `req`에 집어넣은 쿼리러너를 매번 `@Request` 데코레이터로 꺼내쓰는 것은 번거롭다.
+- 오직 쿼리러너만 뽑아쓸 수 있는 데코레이터를 만든다.
+  ```ts
+  export const QR = createParamDecorator(
+    (data, ctx: ExecutionContext) => {
+      const req = ctx.switchToHttp().getRequest();
+      const qr = req.qr as QueryRunner;
+
+      if (!qr)
+        throw new InternalServerErrorException(
+          'QueryRunner 데코레이터를 사용하려면 TransactionInterceptor를 사용해야 합니다.',
+        );
+
+      return qr;
+    },
+  );
+  ```
+- 이제 `@QR()` 데코레이터를 사용하여 쿼리러너를 꺼내쓸 수 있다.
+- 이 파라미터 데코레이터의 사용은 당연히 `TransactionInterceptor`의 사용을 전제로 한다. 

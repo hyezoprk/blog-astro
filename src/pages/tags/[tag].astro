@@ -1,0 +1,43 @@
+---
+import { getAllTags, getSortedPostsData } from '../../lib/posts';
+import Layout from '../../components/layout/Layout.astro';
+import CommandPalette from '../../components/navigation/CommandPalette';
+import TagPageClient from '../../components/tags/TagPageClient';
+import '../../styles/global.css';
+
+export async function getStaticPaths() {
+  const tags = await getAllTags();
+  return tags.map(tag => ({
+    params: { tag },
+  }));
+}
+
+const { tag } = Astro.params;
+const posts = await getSortedPostsData(tag);
+
+const postsData = posts.map(p => ({
+  id: p.id.replace(/\.mdx?$/, '').split('/').pop() ?? p.id,
+  title: p.data.title,
+  date: p.data.date,
+  categories: p.data.categories,
+  tags: p.data.tags,
+  description: p.data.description ?? '',
+  excerpt: p.data.excerpt ?? '',
+  image: p.data.image ?? '',
+}));
+---
+
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body>
+    <CommandPalette client:load>
+      <Layout tag siteTitle={`${tag} 〰 혜조로그`}>
+        <h1 class="pl-4 pt-16">{tag}</h1>
+        <TagPageClient client:load posts={postsData} tag={tag} />
+      </Layout>
+    </CommandPalette>
+  </body>
+</html>

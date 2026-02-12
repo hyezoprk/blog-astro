@@ -1,0 +1,37 @@
+---
+title: Playwright 모바일 테스트 제한
+date: "2024-10-24"
+categories: project
+tags: "어푸"
+description: 테스트
+---
+
+### 발단
+
+현재 글작성 화면에선 모바일이냐 아니냐에 따라서 UI에 차이가 발생한다.
+그래서 어떤 테스트는 모바일 환경에서만 실행되게 제한을 걸어줘야 한다. 그게 아니면 실패가 뜨면서 CI, CD 워크플로로 이어지지 않는다.
+
+### 해결
+스택오버플로에서 `playwright.config.ts`에 grep 방식을 적용하라는 글을 봤는데, 전혀 도움되지 않았다. 에러라도 뜨면 좋을 텐데.. 이게 적용되는 옵션인 건지도 의문. 그래서 공식문서를 보니 `skip()`이라는 방법이 있다. 예시에 나와있진 않지만 `isMobile`이란 옵션이 arg로 주어지기에 둘을 활용하면 될 것 같았다.
+
+```ts register.spec.ts
+test("다음 버튼이 있나요", async ({ page, isMobile }) => {
+  test.skip(isMobile === false, "모바일에서만 적용되는 레이아웃입니다")
+
+  await page.goto("http://localhost:3000/register")
+  const nextButton = page.getByRole("button", { name: "다음" })
+  await expect(nextButton).toBeInViewport()
+  await expect(nextButton).toBeDisabled()
+
+  const select = page.getByRole("combobox")
+  await select.click()
+})
+```
+
+그러면 조건에 걸리는 테스트(여기선 데스크탑)는 실행되지 않고 넘어간다. 전체 테스트 카운트도 그만큼 줄어들고, Report에서도 이런 이유로 패스했다는 말없이 그냥 빠져서 리포트된다.
+
+<br/>
+<br/>
+---
+#### 참고문서
+1. <Lnk text='Playwright 공식문서' href='https://playwright.dev/docs/api/class-test#test-skip' />

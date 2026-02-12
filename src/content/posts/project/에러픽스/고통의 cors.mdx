@@ -1,0 +1,66 @@
+---
+title: 고통의 CORS
+date: "2022-10-10"
+categories: project
+tags: "에러픽스"
+description: 프론트
+---
+<HeadingNavigator />
+으아아 지난 이틀 cors 때문에 아무것도 못했으니..  
+언젠간 마주쳐야 했지만 그게 왜 이번이었는지.. 퍼진다 🫠🫠🫠   
+
+### CORS?
+CORS 에러에 관한 글은 넘치도록 많다. 왜 이딴 게 있어 날 괴롭히는지 원망스러운 글도 많고, 또 해결책도 그만큼이다. 어찌보면 복붙 수준에서 해결될 에러일 수 있지만 내 경우 어떤 솔루션도 먹히지 않았다.  
+<br/>
+해결책은 크게 두 줄기로 나뉘는 것 같다.  
+1. 서버 쪽에서 `cors` 셋팅을 다듬거나  
+2. 클라이언트 쪽에서 `proxy` 또는 `rewrites`를 통해 우회로를 이용하거나
+<br/>
+난 둘 모두 시도했지만 해결하지 못했다. <i>부글부글</i> 
+<Img src='/images/에러/스샷_cors1.webp' />
+<figcaption>삐빅! 허가된 origin이 아닙니다!</figcaption>
+
+### 사실 내 문제는
+얼핏 보면 <q>Protocol, Host, Port</q> 다 일치하는데 뭐가 문젠데? 왜 허락받는데? 싶지만 제대로 안 본 거였다 그거...ㅋㅋㅋㅋ  
+로컬에선 제대로 돌아가는 걸 단서 삼았어야 했다. 그러지 못한 죄로 이틀을 헌납한 거다.  
+<br/>
+아무튼 지금 보면 `www`가 `origin`에만 달려 있다. 난 이 두 개가 같은 건 줄 알았는데, 둘 다 내 소유이긴 해도 엄연히 다른 도메인이었다.  
+그래서 그큐엘 `endpoint`에 `www`를 달아줬고, 그러자 `same-origin`이 아니라던 `preflight` 문제는 어이없게 해결됐다. 애초에 같은 출처인데 `cross-origin`에서 문제를 찾았으니 개념이 없어도 너무 없던 거다.  
+
+### ㅇㅋ 근데 아까 preflight가 뭐였나요
+클라이언트에서 다른 출처에 리소스를 요청할 때는 두 단계로 나뉘어서 진행된다. `preflight`는 이름에서 보듯이 예비비행, 일종의 비자 발급 같은 건데,  
+<br/>
+클라이언트는 외부의 데이터를 `fetch`하기 전에 먼저 "나 지금 <a>그쪽(바깥도메인 서버)</a>에, <a>Content-Type</a>으로 <a>GET</a> 요청하고 싶은데 돼요?"라고 묻는다. 이에 대해 응답서버는 가지고 있는 CORS 셋팅으로 화답한다. 파일럿과 관제탑 사이의 이 사전 교신은 <q>OPTIONS</q> 메쏘드로 처리되고, 둘의 정보를 비교해 신뢰할 수 있다면 본동작으로, 아니면 에러로 이어지게 되는 것이다(아래 그림의 *).
+<Img src='/images/에러/스샷_cors2.webp' />
+<figcaption>출처: Leire Polo의 Medium</figcaption>
+
+
+### 다음을 위한 CORS Settings
+그럴 때 설정할 수 있는 CORS 옵션은 대략 다음과 같다. 이것도 외우기보단 그 역할을 알고 필요할 때 세목을 찾아보는 게 좋을 거 같다.  
+(👺 전제: 와일드카드(*)를 사용해 모든 조건을 허하는 셋팅은 지양할 것)  
+- origin
+- headers
+- methods
+- credentials
+<br/>
+여기서 주의할 점은 요청하는 쪽(client)에서 `credentials` 옵션을 `include`로 설정해놨을 때다.  
+<br/>
+`credentials`는 기본적으로 `same-origin`에 한해서 쿠키나 인증과 관련된 헤더를 요청에 담아 보낸다. 이때 와일드카드도 허용하는 출처로 인정해 버리는데, 그물에 새우 잡힌다고 의도치 않게 민감정보를 넘길 수 있다. 그럴 경우 `include`를 쓰면 좀 더 세밀한 증빙을 요구하게 된다.  
+1. 응답 서버의 명시적인 `allow-origin` 등록 (와일드카드 불허)
+2. 응답 서버의 `credentials: true` 설정
+<br/>
+이로써 내 쿠키가 무분별하게 퍼지는 걸 방지할 수 있다.
+<br/>
+---
+<br/>
+정리한다고는 했는데, 찾아본 양에 비하면 매우 단편적인 이해에 그쳐버린 것 같다. 다음에 맞닥뜨리면 계속해서 다룰 수 있도록 한다.  
+<br/>
+---
+<br/>
+
+#### 참고한 사이트
+1. <Lnk text='아폴로GQL의 CORS 설명' href='https://www.apollographql.com/docs/apollo-server/v4/security/cors/' />
+2. <Lnk text='프리즈마의 CORS 설명' href='https://www.prisma.io/blog/enabling-cors-for-express-graphql-apollo-server-1ef999bfb38d' />
+3. <Lnk text='Leire Polo의 CORS 설명' href='https://medium.com/tribalscale/stop-cursing-cors-c2cbb4997057' />
+4. <Lnk text='evan-moon의 CORS에 관한 거의 모든 것' href='https://evan-moon.github.io/2020/05/21/about-cors/' />
+5. <Lnk text='www가 있고 없고의 차이' href='https://joonius.tistory.com/19' />

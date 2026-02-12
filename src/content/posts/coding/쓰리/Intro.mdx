@@ -1,0 +1,100 @@
+---
+title: Three.js 시작하기
+date: "2023-09-01"
+categories: "coding"
+tags: "쓰리제이에스"
+description: "Intro"
+---
+
+<HeadingNavigator />
+
+
+프론트엔드는 화면을 보기 좋게 표현하는 사람이다. 단정하고 편리한 화면을 제공할수록 기본이 탄탄한 사람일 것이다. 비난의 여지없이 무난함이 곧 미덕이다. 
+<br/>
+그런 관점에서 `Three.js`는 맥락에서 벗어난다. `Three.js`로 얻는 건 즐거움 또는 놀라움이지 사용성, 편의성은 아니라고 생각하기 때문이다. 그럼에도 불구하고 이끌리는 건 왤까? 특별하고 힙해서? 꼭 나쁜 이유만은 아닐 것 같다. 동기야 뭐든 웹을 도화지 삼는 사람에게 표현의 스펙트럼을 넓히는 건 권장할 만한 일 아닌가.
+<br/>
+그래서 공부했다. 이어지는 일련의 노트는 `Yuri`의 GPGPU 강의 정리본이다. 러시아 사람의 어눌한 영어와, 마찬가지 사정의 한국인인 내가 만나 끙끙 앓는 순간도 많았지만ㅋㅋ 최대한 이해하려 노력하면서 배운 과정을 정리한다. 
+<br/>
+하지만 3D 모델링을 다루기에 앞서 2D 텍스쳐 모델링을 먼저 살펴본다. 결국 연계되는 과정이며, 도약은 자연스럽게 일어난다.   
+<Img src='/images/2023/three/example.gif' />
+<figcaption>볼라뇨 『야만스러운 탐정들』에 나오는 수수께끼를 소스로 썼다</figcaption>
+
+
+
+### 선수과제
+그러기 전에 학습하면 좋은 건 `벡터`다. 잘하려면 결국 `미적분`, `삼각함수`도 다뤄야 할 텐데, 문과 교육과정에 미적분이 빠졌던 나에겐 사실 벡터만도 좀 버거웠다. 그렇지만 셰이더 연산에서 벡터의 연산이 반드시 필요하기에 그 개념은 문과적으로라도 이해해야 한다. 여러 방면으로 수혈을 시도했고, 이 영상을 시작으로 추천한다<Lnk text='(링크)' href='https://youtu.be/ArgTeYVuJUo?si=kcGEPmgj0BGk-G1C' />.
+<br/>
+
+
+### 기초개념
+
+허나 오늘은 시작이니 만큼 깊게 들어가진 않고, 요약과 주석을 통해 `Three`의 주요 인스턴스들만 알아보도록 하자.
+
+- Geometry: 점, 선, 면 등의 기하학적 요소를 결정한다.
+- Material: 빛을 받았을 때 어떻게 반응할지를 결정한다. 대표적으로 컬러가 속한다.
+- Mesh: 이 둘을 결합한 실제적인 피사체다. 형상과 질료의 조합.
+
+- Camera: 보통은 `PerspectiveCamera`를 사용한다. 원근법이 적용된 카메라고, 반대는 `OrthographicCamera`다. 카메라는 네 개의 파라미터를 받는다.
+> 1. 카메라 광각: 앵글이 작아지면 망원렌즈, 앵글이 커지면 어안렌즈를 사용한 것과 같다. 특정한 효과를 의도하는 게 아니라면 45~75도 사이를 권한다.
+> 2. 카메라 뷰포트 비율: 화면의 가로/세로비다.
+> 3. 니어값: 얼마나 가까이에 있는 사물까지 보여줄지를 결정한다. 이 값보다 작은 z는 렌더링되지 않는다.
+> 4. 파값: 얼마나 멀리 있는 사물까지 보여줄지를 결정한다. 이 값보다 큰 z는 렌더링되지 않는다.
+   <br />
+
+셋팅 실례를 보자. 함수형이든 클래스든 편한 대로 작성하면 된다.
+```js sketch.js
+class Sketch {
+  constructor(configs){
+    this.scene = new THREE.Scene(); // 무대를 준비한다.
+
+    // 컨테이너 사이즈를 가져온다. 캔버스 사이즈와 뷰파인더 사이즈를 여기에 동기화한다.
+    this.container = configs.dom;
+    this.width = this.container.offsetWidth;
+    this.height = this.container.offsetHeight;
+
+    // 렌더러를 만든다.
+    // 렌더러는 무대와 카메라가 담길 캔버스다. container > canvas > scene + camera
+    this.renderer = new THREE.WebGLRenderer({
+      alpha: true,
+    })
+    this.renderer.setSize(this.width, this.height); // 사이즈 동기화
+    this.renderer.setClearColor(0xffffff, 1);  // 배경색 지정
+    this.container.appendChild(this.renderer.domElement); // container의 child로 놓기
+
+    this.camera = new THREE.PerspectiveCamera(
+    	70,  // 카메라 앵글
+      this.width / this.height, // 카메라 뷰파인더 비율
+      0.01,  // 카메라에 담을 최소 거리(min z)
+      100,  // 카메라에 담을 최대 거리(max z)
+    )
+    this.camera.position.z = 1;   // 카메라를 얼마나 띄울지 설정한다.
+
+    // 무대(Scene)에 올릴 도형을 셋팅한다.
+    // geometry는 형태, material은 성질을 담당한다.
+    this.geometry = new THREE.SphereGeometry(3, 64, 64);
+    this.material = new THREE.MeshStandardMaterial({
+      // 성질에 관여하는 파라미터는 무수히 많다
+      color: "#00ff88";
+      ...
+    })
+    // 이제 형태와 성질을 조합하여 하나의 오브제를 만든다
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+
+    // 만들어진 오브제를 무대에 올린다
+    this.scene.add(this.mesh);
+    // 준비된 무대와 카메라를 렌더러에 제출하면 끝
+    this.renderer.render(this.scene, this.camera);
+
+    // ..이 아니고, 여기까지 하면 찍히는 건 단 한장의 사진이다.
+    // 아직은 아무 애니메이션 동작도 걸지 않았지만
+    // 연속적인 움직임을 갖게 하기 위해서는 이를 반복적으로 요청해야 한다.
+    this.render()
+  }
+
+  render(){
+    this.renderer.render(this.scene, this.camera);
+    // this가 window를 참조하지 않도록 바인드를 잊지 말자
+    window.requestAnimationFrame(this.render.bind(this));
+  }
+}
+```

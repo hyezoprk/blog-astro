@@ -1,0 +1,216 @@
+---
+title: 이메일 로그인 + 카카오/네이버 OAuth
+date: "2024-10-14"
+categories: project
+tags: [어푸]
+description: 백엔드
+pinned: true
+---
+<HeadingNavigator />
+
+### 이메일 로그인 도입 배경
+로그인을 기획하면서 가급적 많은 정보를 받진 않기로 했다. 소규모 프로젝트(이른바 듣보잡 회사)에 개인정보를 넘겨주는 일은 고객 입장에서 달가운 일이 아닐 거라 생각했다. 현물이 움직이는 서비스라면 그럼에도 전화번호 인증을 받아야겠지만, Apuu는 그런 서비스가 아니며 오히려 가벼운 커뮤니티를 지향한다. 따라서 이메일만 인증의 대상으로 삼기로 했다.
+
+### 이메일, 유료인가요?
+프론트엔드만 할 적엔 메일을 보내는 서비스가 유료라고 생각했다. `Brevo`나 기타 등등 SMTP 서비스들을 사용한 적이 있으나 무료 사용량 제한이 있어 여간 찝찝한 게 아니었다. 가난한 개발자는 아낄 수 있는 데서는 아껴야 한다.
+그런데 `nodemailer`를 사용하면 무료로 메일을 보낼 수 있다. 유료 팀 서비스인 `Workspace`를 사용할 것도 없고, 그냥 팀의 관리자가 대표로 계정을 생성하여 그를 오피셜 아이디로 사용하면 됐다. 게다가 참고할 레퍼런스도 많다. 유레카
+
+다음은 프로젝트에서 인증코드 발송을 구현한 코드다.
+
+```ts auth.service.ts
+...
+private createTransporter(): Mail {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: this.configService.get<string>(ENV.EMAIL_USER_KEY),
+        pass: this.configService.get<string>(ENV.EMAIL_PASS_KEY),
+      },
+    });
+  }
+
+async sendVeryficationCode(email: string) {
+  const transporter = this.createTransporter();
+  const verifyCode = this.generateRandomCode();
+  const logoImage = await fs.readFile(PUBLIC_FOLDER_PATH + '/logo.png');
+  const mailOptions = {
+    to: email,
+    subject: '이메일 주소 확인',
+    html: MAIL_TEMPLATE(verifyCode),
+    attachments: [
+      {
+        filename: 'logo.png',
+        content: logoImage,
+        encoding: 'base64',
+        cid: 'logo@apuu',
+      },
+    ],
+  } satisfies Mail.Options;
+
+  try {
+    await this.cacheManager.set(email, verifyCode, 120000);
+    await transporter.sendMail(mailOptions);
+    return { success: true, message: '인증 코드가 전송되었습니다' };
+  } catch (err) {
+    throw new InternalServerErrorException(
+      `인증 코드를 Redis에 저장하는 데 실패했습니다. ${err.message}`,
+    );
+  }
+}
+```
+<br/>
+인증코드 발급에는 레디스를 활용했다. 이메일과 생성된 인증코드를 각각 키와 값으로 저장했고, 유저는 ttl 시간 안에 인증을 완료해야 한다.
+유저에게 보내지는 메일은 `html` 프로퍼티에 담긴다. 템플릿을 만들어 메일을 보내본 결과
+<Img src='/images/2024/nodemailer1.webp' />
+<figcaption>네이버 메일</figcaption>
+
+<br/>
+네이버 메일만 확인했을 때 잘 됐다 싶었는데 이슈가 생겼다. 네이버에서 문제없던 템플릿이 구글에서는 망가져서 보였던 것. 찾아보니 `Gmail`에서는 `flexbox` CSS를 지원하지 않는다고 한다.
+그래서 기존 템플릿을 수정하여 `table`을 사용했다. 다음은 고쳐진 Gmail의 모습
+
+<Img src='/images/2024/nodemailer2.webp' />
+<figcaption>Gmail</figcaption>
+
+<br/>
+원하는 대로 구현이 됐다
+
+
+### 카카오/네이버 OAuth
+그러나 버튼 한번으로 가입할 수 있는 것만큼 편한 건 없다. 고객입장에서도 대기업을 거치는 인증을 훨씬 달가워 할 것이다(라고 판단했다). 이 때문에 OAuth를 통한 회원가입도 구비하게 되었다.
+
+역시나 `Nest.js`는 필요하다 싶은 건 다 주고 있고 `Passport` 모듈 또한 제공하고 있다. 라이브러리 `passport-kakao`, `passport-naver` 또한 나와 있는 상황이어서 이를 쉽게 확장하여 OAuth를 구현할 수 있다. 구현방식은 똑같기 때문에 하나를 할 줄 아니 다음은 쉬워졌다.
+
+하지만 염치없이 알맹이만 쏙 빼먹고 빠질 순 없는 노릇. OAuth의 작동 흐름과 같이 살펴보자.
+
+
+### OAuth 이해
+여러 가지 도표가 나와 있지만 카카오에서 작성한 게 가장 이해하기 좋았다. 지금 서비스에 딱 들어맞는 설명처럼 보였다.
+
+<Img src='/images/2024/kakaologin_sequence.webp' />
+<figcaption>카카오 OAuth Flow</figcaption>
+<br/>
+<br/>
+도표를 반복해서 말하기보다 내 서버의 역할은 무엇인지, 클라이언트에서는 뭐를 처리하면 되는지를 짚어보는 게 낫겠다 싶다.
+<br/>
+우선 클라이언트에서 살펴보면 사용자는 회원가입이 요구되는 화면에서 이메일/카카오/네이버 로그인 버튼을 보게 된다. 여기서 카카오를 클릭한다고 치면
+<details>
+  <summary>이 버튼은 어디로 연결되고 있을까?</summary>
+  <p>정답: 카카오 서버로 직접 연결되는 것이 아니라, 내 서버를 통해 카카오 서버로 리디렉션된다. 즉, 내 서버에서 마련한 `login/kakao` API로 연결한다</p>
+</details>
+<br />
+서버에서는 해당되는 라우트에 `passport-kakao`가 작동하도록 구비해두면 될 것이다. 구현한 코드는 다음과 같다.
+```ts auth.controller.ts
+import { AuthGuard } from '@nestjs/passport';
+...
+@Get('login/kakao')
+@UseGuards(AuthGuard('kakao'))
+@HttpCode(301)
+async postLoginKakao(
+  @Req() req: Request & { user: OAuthUserType }, // 내가 받아낼 타입을 작성
+  @Res() res: Response,
+) {
+  ...
+}
+```
+
+이때 `@nestjs/passport` 모듈에서 `AuthGuard`란 걸 제공해준다. 여기에 `kakao`, `naver` 등을 입력하면 되는데, 이는 임의로 작명하는 게 아니라 설치한 라이브러리 `passport-이름`에서 뒷부분에서 오는 것이다. 그러면 `AuthGuard`는 해당되는 라이브러리를 연동하여 OAuth를 진행한다. 아래 내용 참고
+> <label className="green" />
+> With `@UseGuards(AuthGuard('local'))` we are using an AuthGuard that @nestjs/passportautomatically provisioned for us when we extended the passport-local strategy. Let's break that down. Our Passport local strategy has a default name of 'local'. We reference that name in the @UseGuards() decorator to associate it with code supplied by the `passport-local` package. This is used to disambiguate which strategy to invoke in case we have multiple Passport strategies in our app (each of which may provision a strategy-specific AuthGuard). While we only have one such strategy so far, we'll shortly add a second, so this is needed for disambiguation.[^1]
+> <cite>nestjs 공식문서</cite>
+
+그러면 `passport-kakao`가 작동하여 카카오 로그인 화면을 클라이언트에 내보낸다. 이때 카카오는 이  로그인 요청이 어떤 앱, 어떤 개발자에게서 오는지 설정을 확인하는데, 그 셋팅을 `kakao.strategy.ts`에 작성한다. 이는 카카오 개발자 센터에서 발급받을 수 있다[^2].
+
+```ts kakao.strategy.ts
+@Injectable()
+// 이름은 기본적으로 'kakao'인데 지정해줄 수도 있다
+export class KakaoStrategy extends PassportStrategy(Strategy, "kakao") {
+  constructor(private readonly configService: ConfigService) {
+    super({
+      clientID: configService.get<string>(ENV.KAKAO_CLIENT_ID_KEY),
+      clientSecret: configService.get<string>(ENV.KAKAO_CLIENT_SECRET_KEY),
+      callbackURL:
+        process.env.NODE_ENV === 'development'
+          ? 'http://localhost:3002/api/auth/...'
+          : 'https://apuu.us/api/auth/...',
+    });
+  }
+}
+```
+
+유저가 로그인을 했다면 이 앱에서 어떤 데이터를 요구하는지(프사, 닉네임, 이메일 등) 카카오 쪽에서 또다시 동의화면을 내보낸다. 유저가 승낙하면 카카오는 인가 코드를 전달하고, 서버는 이를 사용해 카카오에 데이터 발급을 요청한다. 그러면 개발자 센터에 설정했던 `callbackURL`로 토큰과 데이터가 발급된다. 이는 strategy의 `validate` 메서드에서 받아볼 수 있다.
+
+직접 하려면 복잡한 과정인데, `passport-kakao` 라이브러리 덕분에 쉽게 처리할 수 있었다(압도적 감사..) 원래의 작업은 다음 블로그를 참고[^3]
+
+```ts kakao.strategy.ts
+@Injectable()
+export class KakaoStrategy extends PassportStrategy(Strategy) {
+  constructor(private readonly configService: ConfigService) {
+    super({
+      clientID: ...,
+      clientSecret: ...,
+      callbackURL: ...
+    });
+  }
+
+  async validate(
+    accessToken: string,
+    refreshToken: string,
+    profile: Profile,
+    done: (error: any, user?: any, info?: any) => void,
+  ) {
+    try {
+      const { _json } = profile;
+      const user = {
+        email: _json.kakao_account.email,
+        nickname: String(_json.kakao_account.email).match(/^[^@]+/)[0],
+        provider: Providers.KAKAO,
+      } satisfies OAuthUserType;
+      done(null, user);
+    } catch (error) {
+      done(error);
+    }
+  }
+}
+```
+
+필요한 유저 정보는 `profile` 안에 있으니 찾아서 가져오면 된다. 나는 `email`만 요청했고 이 데이터는 `_json` 안에 들어있어 뽑아왔다. 닉네임은 별도로 요구받지 않는 대신 이메일에서 추출하여 사용하려 했다.
+
+> <label className="orange" />
+> 카카오에서 발급해준 토큰은 카카오 서버에 요청을 보낼 때 쓰이는 토큰이다. 내 서버에서 발급하는 jwt와 수명도, 페이로드도 다른 별개의 토큰. 카카오 서버에 따로 접근할 일이 없어 내 경우 사용하지 않았다.
+
+`done`의 첫번째 파라미터는 에러를, 두번째 파라미터에는 데이터를 담는다. 담은 데이터는 요청객체 `req`에 담기게 된다. 나는 아래와 같이 사용했다.
+
+```ts auth.service.ts
+  async oAuthLogin(req: Request & { user: OAuthUserType }) {
+    const user = await this.validateOAuthUser(req.user);
+    const tokens = this.loginUser(req, user);
+    return { user, tokens };
+  }
+
+  async validateOAuthUser({ email, nickname, provider }: OAuthUserType) {
+    try {
+      return await this.usersService.getUserByEmail(email);
+    } catch (error) {
+      return await this.usersService.createUser({
+        email,
+        nickname,
+        provider,
+        password: null,
+      });
+    }
+  }
+```
+
+이미 가입한 메일이면 기존 유저 데이터를 반환했고, 첫가입이면 새로운 계정을 생성해서 유저 데이터를 반환했다. 이어 로그인 로직에서 액세스 토큰과 리프레쉬 토큰을 발급, 유저 데이터와 함께 리턴시켰다. 이후부터는 이메일로 로그인한 유저와 차이가 없다.
+
+네이버도 구글도 똑같이 작동한다[^4][^5].
+
+<br/>
+<br/>
+---
+#### 참고문서
+[^1]: <Lnk text='Passport (auth)' href='https://docs.nestjs.com/recipes/passport' />
+[^2]: <Lnk text='카카오 Developers' href='https://developers.kakao.com/console/app/' />
+[^3]: <Lnk text='카카오 소셜 로그인/회원가입하기' href='https://velog.io/@mogooee/%EC%B9%B4%EC%B9%B4%EC%98%A4-%EC%86%8C%EC%85%9C-%EB%A1%9C%EA%B7%B8%EC%9D%B8%ED%9A%8C%EC%9B%90%EA%B0%80%EC%9E%85-feat.-OAuth-2.0-jwt-%ED%86%A0%ED%81%B0-firebase' />
+[^4]: <Lnk text='네이버 Developers' href='https://developers.naver.com/apps/' />
+[^5]: <Lnk text='구글, 네이버, 카카오 소셜로그인 구현' href='https://ilikezzi.tistory.com/64#Google%2C%20Naver%2C%20Kakao%20-%20secret%20key%20%EB%B0%9C%EA%B8%89-1' />

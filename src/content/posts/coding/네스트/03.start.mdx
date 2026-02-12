@@ -1,0 +1,42 @@
+---
+title: 프로젝트 셋업
+date: '2023-11-14'
+categories: coding
+tags: "네스트"
+description: "03"
+---
+<HeadingNavigator />
+
+### 프로젝트 생성
+- NestJS cli를 쓰면 이점이 많기 때문에 먼저 cli부터 설치한다.
+- 설치 후 new 키워드를 사용해 새 프로젝트를 만든다.
+```bash
+npm i -g @nestjs/cli
+nest new 프로젝트명
+```
+
+### 모듈 생성
+- CLI를 사용해 프로젝트 환경을 만들었다면 `app.module`이 기본적으로 생성돼 있는 것을 볼 수 있다.
+- 하나의 모듈은 컨트롤러, 서비스, 테스터로 구성된다.
+- `app.module`은 다른 모듈들을 쌓아올리는 용도다. 되도록 `app.contoller`에는 엔드포인트를 정의하지 않고 초기상태 그대로, 백지로 둔다.
+- 새 모듈을 만들어 작업한다.
+```bash
+nest g resource
+```
+> <b>터미널에서 아래의 단계가 진행된다</b>
+> 1. 모듈 이름 설정
+> 2. RestAPI, GraphQL, Websocket 등 API 교신 방법 선택
+> 3. 선택을 마치면 모듈 이름을 바탕으로 컨트롤러와 서비스가 연동된 채 생성
+
+<br/>
+---
+<br/>
+
+cli를 사용하면 NestJS의 시스템에 맞게 모듈이 생성되므로 편리하다.
+1. 제공한 이름으로 파일들이 생성된다.
+2. 파일마다 클래스, 어노테이션 등 기본 코드가 작성되어 있다.
+3. 자동으로 `app.module`에도 등록된다.
+
+<br/>
+#### 참고링크
+- [NestJS 공식문서](https://docs.nestjs.com/)

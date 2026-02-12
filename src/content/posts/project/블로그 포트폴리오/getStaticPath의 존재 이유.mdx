@@ -1,0 +1,80 @@
+---
+title: "getStaticPaths의 존재 이유"
+date: "2022-08-28"
+categories: "project"
+tags: "블로그 포트폴리오"
+description: "feat"
+excerpt: 쓰면서 이해하려 애써요.
+---
+<HeadingNavigator />
+처음 Next.js를 하면서 이해가 어려웠던 부분 중 하나가 `getStaticPaths()` 였다. 다이나믹 라우트에서 쓰이는 건 알겠는데, 왜 SSG에서만 필요로 할까?  
+오늘은 재정비하는 차원에서 일반적인 얘기를 좀 흘려본다.
+
+### 다이나믹 라우팅
+Next에서 라우팅 처리는 쉽다. 간단하게 `pages` 폴더에 넣어주면 끝이 난다. 그리고 거기에 놓인 파일 이름은 곧장 홈페이지에서 쓰이는 경로가 되고. `pages` 폴더의 계층 트리가 그대로 주소값으로 쓰이는 거다. 멋진 신세계.  
+파일을 다이나믹 라우트로 만들고자 한다면 이름을 대괄호로 감싸준다. 그럼 그 파일=경로는 일당백 루트로 탈바꿈한다.  
+ex) `src/pages/posts/[id].tsx`  
+-> `www.내주소.com/posts/[id]`  
+<br/>
+여기서 문제가 있다.  
+
+### idk where u going
+
+문제는 이 `[ ]`에 어떤 경로가 들어올지 SSG 서버의 <q>빌드타임</q>에서는 알 수가 없다는 거다. query를 알 수 없는 시점이다 보니 페이지를 만들 수도 없다. 가공업체인데 원자재가 없어서 일을 못하는 실정인 거다. 그래서 가능한 모든 경로를 미리 귀띔해줘야 하는데, 그게 바로 `getStaticPaths(  )`가 하는 일이다.
+<br/>
+내 코드로 예를 들면
+<CH.Section>
+<CH.Code>
+```tsx /pages/posts/[id].tsx
+export async function getStaticPaths() {
+  const paths = getAllPostIds();
+  return {
+    paths,
+    fallback: false,
+  };
+}
+
+export async function getStaticProps({ params }: IdProps) {
+  const postData = await getPostData(params.id);
+  return {
+    props: {
+      ...postData,
+    },
+  };
+}
+```
+```ts /libs/posts.ts
+export function getAllPostIds() {
+  const allPostsData = getAllFiles(postsDirectory);
+  return allPostsData.map(post => {
+    return {
+      params: {
+        id: post.id,
+      },
+    };
+  });
+}
+```
+</CH.Code>
+[1. 먼저 getStaticPath(  )에서 paths 값을 구하고 있다](focus:///pages/posts/[id].tsx#2)  
+[2. getAllPostIds(  )는 모든 글들의 id를 params로 가지고 온다](focus:///libs/posts.ts#1:12)  
+[3. 빌드타임은 이를 토대로 정적인 페이지들을 생성한다](focus:///pages/posts/[id].tsx#1:7)  
+</CH.Section>
+
+<br/>
+#### 💥 그럼 SSR은요?
+SSR 서버는 요청이 있을 때마다 페이지를 생성한다. 페이지 생성이 빌드타임에만 있지 않아서, 그때그때, 요청이 들어오는 족족 아이디를 받아낼 수 있다. 들어오는 params는 `getServerSideProps(context)`에서 확인할 수 있다.[^1]
+
+### 정리
+SSG와 SSR 모두 프리-렌더링 되는 페이지다. 하지만 다이나믹 라우팅에서 둘은 차이가 난다. 그 이유는
+- SSG는 빌드타임에 모든 경로들의 페이지를 생성한다.  
+- 마치 오전반차 쓰고 퇴근하는 직장인과도 같은데, 그래서 되도록 많은 일을 해두려고 한다. SSR처럼 기다리면서 일일이 요청에 응할 수 없는 것이다.  
+- 하지만 다이나믹 라우트가 섞이면 들어올 페이지는 무궁무진해진다. (`fallback`[^2] 참고)  
+- 때문에 정적으로 생성해야 하는 페이지들의 정보(`[ ]에 들어오는 변수값`)를 미리 전달해줄 것을 요구한다: `getStaticPaths()`의 리턴값인 `paths`다.
+- 그를 바탕으로 정적인 페이지들을 생성한 뒤, 첫 로드는 서버에서, 이후엔 리액트에 전권을 일임한다.  
+
+<br/>
+<hr/>
+#### 참고한 사이트
+[^1]: <Lnk text={'getStaticProps(  )에서 바로 params를 받을 수 없는 이유'} href={'https://github.com/vercel/next.js/discussions/17529'} />
+[^2]: <Lnk text={'Next.js fallback'} href={'https://nextjs.org/docs/api-reference/data-fetching/get-static-paths#fallback-false'} />

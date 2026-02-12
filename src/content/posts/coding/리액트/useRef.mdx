@@ -1,0 +1,83 @@
+---
+title: "useRef 주의사항"
+date: '2023-01-03'
+categories: coding
+tags: 리액트
+description: useRef  
+---
+<HeadingNavigator />
+
+### useRef
+`useRef`는 두 가지 기능을 한다.  하나는 변수나 state처럼 값을 저장하는 역할, 다른 하나는 DOM 셀렉터다.  
+
+> <label className="green" />
+> **state, 변수와의 차이점**  
+> `useState`는 값이 바뀔 때마다 컴퍼넌트의 리렌더를 유발하고, 변수는 컴퍼넌트가 렌더링될 때마다 초기화된다.  반면 `useRef`는 값이 바뀌더라도 컴퍼넌트 전체의 렌더링을 야기하지 않는다.  또한 컴퍼넌트가 리렌더링될 때도 기존의 값을 보전한다.  
+
+### 사용방법
+1. 값을 보관하는 경우  
+초기값은 useState처럼 쓰면 된다. 제네릭에 타입을 생략해도 잘 유추해낸다.
+```tsx index.tsx
+const value = useRef<string>("")
+```
+<br/>
+2. DOM 셀렉터의 경우  
+초기값을 `null`로 명시하고, 요소의 `ref`에 걸어준다.
+```tsx index.tsx
+export default function App(){
+  const inputRef = useRef<HTMLInputRef>(null)
+
+  return (
+    <>
+      <input ref={inputRef} />
+    </>
+  )
+}
+```
+
+#### 여기서 초기값이 `null`인 이유
+훅이 들어오는 렌더 단계에서는 커밋 단계의 돔을 알지 못한다. 다시 말해 `useRef`가 선언되는 함수 구현부는 jsx 리턴부를 알기 전이다. 앞으로 어떤 DOM 요소가 그려질지, 어떤 요소를 참조할지 아직 알지 못하는 상태다.  
+그렇기 때문에 DOM 셀렉터로서 `useRef`를 사용할 때는 초기값에 `null`을 명시해 줘야 한다.
+<Img src='/images/에러/스샷_useRef에러.webp' />
+<figcaption>아니면 이런 사단이 난다</figcaption>
+<br/>
+DOM이 다 그려지는 시점에는 요소를 제대로 취득할 거라 예상되는 바, 이펙트 안에서 `.current`를 통해 요소가 제대로 걸렸는지 유효성을 확인할 수 있다.
+
+```tsx index.tsx
+export default function App(){
+  const inputRef = useRef<HTMLInputRef>(null)
+
+  useEffect(()=> {
+    inputRef.current && inputRef.current.focus()
+  }, [])
+
+  return (
+    <>
+      <input ref={inputRef} />
+    </>
+  )
+}
+```
+
+### 각각의 타입
+용도에 따라 타입도 두개로 양분된다.
+```ts index.d.ts
+  /** 값보관 useRef: 값 수정이 가능 */
+  interface MutableRefObject<T> {
+    current: T;
+  }
+
+  /** 
+   * 셀렉터 useRef: 요소 변경이 불가능
+   * 하지만 선택된 DOM 객체의 속성 수정은 가능하다.
+   * @example
+   * ref.current.value = "#$%"
+   */
+  interface RefObject<T> {
+    readonly current: T | null;
+  }
+```
+<figcaption>코멘트 참고</figcaption>
+<br/>
+그러면 아까 스크린샷의 에러 문구가 이해된다. 초기값 설정시 값을 비워두면, 이게 값 보관 `useRef`의 `undefined`로 읽히면서 타입이 `MutableRefObject`로 정해졌던 것이다.  
+`useRef`를 셀렉터로 쓸 땐 꼭 `null`을 명시하도록 하자

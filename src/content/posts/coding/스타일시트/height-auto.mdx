@@ -1,0 +1,80 @@
+---
+title: "height:auto"
+date: '2024-07-27'
+categories: coding
+tags: 스타일시트
+description: height
+---
+<HeadingNavigator />
+
+
+### Height의 난해함
+처음 CSS를 대할 때 제일 지랄맞은 부분은 `height`였다.  
+너비야 보통 한프레임(100vw)을 넘지 않지만 높이는 가변성이 워낙 컸기 때문이다. 개념이 없을 때는 값을 할당해도 변화가 있는 둥 마는 둥 헤맬 때가 많았다. 그렇다고 고정값을 남발하자면 UI가 부자연스러워지는 느낌이고.  
+
+그래서 퍼센트는 사랑스럽다. 그리고 퍼센트를 사용할 땐 부모요소를 항상 주시해야 하는데, 왜냐면 부모 요소 사이즈를 기준으로 이 프로티지가 계산되기 때문이다.
+
+> <label className="red" />
+> `Kevin Powell`은 되도록 height 값을 할당하지 말 것을 당부한다. height를 고정시키는 것은 위험하며 대신 용도에 맞게 `min-height`나 `max-height`를 사용하길 권장한다. 그 경우 범위 내에서 자연스럽게 높이가 조정된다는 이점이 있으며, 오버플로되는 부분은 스크롤 등으로 처리할 수 있다.
+
+### height: auto?
+퍼센트나 px, vh(lvh, dvh..) 등등은 자주 써서 쉽게 익숙해지는 반면, 와중에 가장 와닿지 않는 height의 속성값은 `auto`였다. 오토를 보면 "이게 어떻게 계산되는 거지?" 스크린을 보며 확인하는 과정이 추가로 필요했던 것이다.
+
+그 이유는 `auto`가 부모에 여의치 않기 때문이다. 오토는 퍼센트와 달리 부모 크기를 고려하지 않고, 대신 자기 컨텐트의 사이즈에 맞춰 크기를 맞춘다.
+
+### 응용
+이런 원리를 응용한 신박한 powell의 영상이 있다. `grid-template-rows`의 프레임 속성은 height: auto와 같은 효과가 적용되는데
+```css
+.wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+}
+
+.wrapper > div {
+  overflow: hidden;
+}
+```
+
+`0fr`으로 두면 일종의 null과 같은 값이다. 그런데 여기서 마우스 호버시 `1fr`의 값을 준다면,
+
+```css mark=10:12
+.wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+}
+
+.wrapper > div {
+  overflow: hidden;
+}
+
+.wrapper:hover {
+  grid-template-rows: 1fr;
+}
+```
+
+컨텐츠의 높이만큼 높이가 할당되면서 그 안의 내용이(몇줄이든 다) 보이게 될 것이다. 이게 height: auto의 역할이기 때문이다.  
+그리고 여기에 `transition`을 주면 너무나 쉽게 아코디언이 만들어진다.
+```css
+.wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  // focus
+  transition: grid-template-rows 500ms;
+}
+
+.wrapper > div {
+  overflow: hidden;
+}
+
+.wrapper:hover {
+  grid-template-rows: 1fr;
+}
+```
+
+<Img src='/images/2024/grid height.gif' />
+
+<br/>
+<br/>
+---
+#### 참고자료
+1. <Lnk text='The simple trick to transition from height 0 to auto with CSS' href='https://www.youtube.com/watch?v=B_n4YONte5A' />

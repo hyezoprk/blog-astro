@@ -1,0 +1,69 @@
+---
+import '../../styles/global.css';
+import Seo from './Seo.astro';
+import Nav from '../navigation/Nav.astro';
+import FlyingLogo from '../navigation/FlyingLogo';
+
+interface Props {
+  siteTitle?: string;
+  home?: boolean;
+  tag?: boolean;
+  category?: string;
+}
+
+const { siteTitle, home, tag, category } = Astro.props;
+---
+
+<div class="h-auto min-h-screen w-full dark:bg-zinc-900/90 dark:text-slate-200/80">
+  <FlyingLogo client:load />
+  <div class={`container mx-auto ${home ? 'max-w-4xl' : category === 'reading' ? 'max-w-xl' : 'max-w-3xl'}`}>
+    <header>
+      <Seo siteTitle={siteTitle} />
+      <Nav />
+    </header>
+
+    <section class="pt-10">
+      <article>
+        <slot />
+      </article>
+
+      {tag ? (
+        <footer class="ml-3 mt-16 pb-20 text-base">
+          <a href="/" class="no-underline" id="prev-link-tag">← Previous</a>
+        </footer>
+      ) : !home && (
+        <footer class="ml-3 mt-16 pb-20 text-base">
+          <a href="/" class="select-none no-underline" id="prev-link">← Previous</a>
+        </footer>
+      )}
+    </section>
+  </div>
+</div>
+
+<script>
+  // tag 페이지의 Previous 버튼: 카테고리로 복귀
+  const tagLink = document.getElementById('prev-link-tag');
+  if (tagLink) {
+    tagLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      const watchedTab = sessionStorage.getItem('watchedTab');
+      if (watchedTab === '2') {
+        window.location.href = '/?category=reading';
+      } else if (watchedTab === '1') {
+        window.location.href = '/?category=project';
+      } else {
+        window.location.href = '/';
+      }
+    });
+  }
+
+  // 포스트 페이지의 Previous 버튼: 이전 페이지로 복귀
+  const prevLink = document.getElementById('prev-link');
+  if (prevLink) {
+    prevLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      const path = sessionStorage.getItem('path');
+      window.location.href = path || '/';
+    });
+  }
+</script>

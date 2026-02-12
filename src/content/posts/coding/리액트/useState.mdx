@@ -1,0 +1,233 @@
+---
+title: useState 동작원리
+date: '2023-01-15'
+categories: coding
+tags: 리액트
+description: useState
+---
+<HeadingNavigator />
+
+리액트에 관해선 선배들이 알려준 대로, 일종의 공식처럼 따르는 부분이 많다. 그래서 아주 쉬운 생각도 보지 못하고 지나친 때가 많았음을 고백해둔다. 이 지면은 작은 반성문이다. 두루뭉술 지나갔던 개념들을, 엄청나진 않아도 적어도 나의 무지를 드러내는 작은 확대경으로 살펴본다.  
+<br/>
+첫시작은 리액트의 근간을 이루는 `useState`다.   
+<br/>
+---
+
+### Hook's Ordering
+리액트에서는 훅의 순서가 중요하다. `import`가 모듈의 최상단에 와야만 하는 것처럼, 리액트 훅은 컴퍼넌트 렌더링 코드의 최상단에 위치해야만 한다. 이를 무시하면 화면에서 에러를 띄우는데 그래서 좋든 싫든 타성적으로 외우게 되는 부분 중 하나일 거다.  
+<Img src='/images/2023/react/훅스는 최상위에.webp' />
+> Hooks can only be called at the top level of components or your own Hooks.  
+
+<br/>
+이유를 묻기 앞서 한번 생각해보았다.  
+`useState`는 컴퍼넌트 내부에서 선언되지만 실제 그 값은 외부에 저장된다. 그래서 컴퍼넌트가 깜빡, 리렌더링 돼도 변화된 값은 함수 바깥에 저장되어 있기에 안전하게 보관, 불러올 수 있다.  
+<br/>
+그런데 어떻게? 컴퍼넌트는 어떤 식으로 이 업데이트된 값들을 저장하고 불러오고 있는 걸까?  
+답부터 말하면 훅이 선언되는 순서를 이용해 `index`를 부여해서, 그리고 **_클로저_**를 이용해서다.  
+<br/>
+아래 코드는 그를 개념적으로 구현한 예시다.[^1]  
+리액트 팀에서 제공한 코드니 각주없이 봐도 충분히 읽힐 것이다.
+
+<CH.Code>
+```js index.js focus=3:32
+import sculptureList from "./data.js"
+
+let componentHooks = [];
+let currentHookIndex = 0;  // updateDOM()이 실행될 때(=리렌더링마다) 0으로 초기화
+
+function useState(initialState) {
+  let pair = componentHooks[currentHookIndex];
+  if (pair) {
+    // 두번째 이상 렌더시 진입
+    // 앞서 선언된 state쌍이 미리 들어와 있을 것
+    // 저장돼 있는 값을 리턴하고 다음 순서의 훅을 처리하러 감.
+    currentHookIndex++;
+    return pair; // [initState, setState].. 디스트럭션에 의해 사용자 선언이 가능한 모양새
+  }
+
+  // 최초 렌더시 진입
+  // 한쌍의 state(= initValue & setter 클로저)를 만들고 저장.
+  pair = [initialState, setState]; 
+
+  function setState(nextState) {
+    // 유저가 state를 바꿀 때 사용되는 함수
+    // 파라미터로 오는 값이 state의 value값이 됨
+    pair[0] = nextState; // 렉시컬 스코프에 의해 자신의 파트너 value를 항상 참조하게 됨
+    updateDOM();  // 업데이트: 리렌더링 트리거
+  }
+
+  // state쌍을 다음 렌더에도 쓰기 위해 외부 배열에 담아놓음
+  // 그대로 리턴하고 다음 순서의 useState에서 같은 작업을 반복.
+  componentHooks[currentHookIndex] = pair;
+  currentHookIndex++;
+  return pair; // [initState, setState].. 디스트럭션에 의해 사용자 선언이 가능한 모양새
+}
+
+function Gallery() {
+  // Each useState() call will get the next pair.
+  const [index, setIndex] = useState(0);
+  const [showMore, setShowMore] = useState(false);
+
+  function handleNextClick() {
+    setIndex(index + 1);
+  }
+
+  function handleMoreClick() {
+    setShowMore(!showMore);
+  }
+
+  let sculpture = sculptureList[index];
+  // This example doesn't use React, so
+  // return an output object instead of JSX.
+  return {
+    onNextClick: handleNextClick,
+    onMoreClick: handleMoreClick,
+    header: `${sculpture.name} by ${sculpture.artist}`,
+    counter: `${index + 1} of ${sculptureList.length}`,
+    more: `${showMore ? 'Hide' : 'Show'} details`,
+    description: showMore ? sculpture.description : null,
+    imageSrc: sculpture.url,
+    imageAlt: sculpture.alt
+  };
+}
+// focus
+function updateDOM() {
+  // Reset the current Hook index
+  // before rendering the component.
+  // focus
+  currentHookIndex = 0; 
+  let output = Gallery();
+
+  // Update the DOM to match the output.
+  // This is the part React does for you.
+  nextButton.onclick = output.onNextClick;
+  header.textContent = output.header;
+  moreButton.onclick = output.onMoreClick;
+  moreButton.textContent = output.more;
+  image.src = output.imageSrc;
+  image.alt = output.imageAlt;
+  if (output.description !== null) {
+    description.textContent = output.description;
+    description.style.display = '';
+  } else {
+    description.style.display = 'none';
+  }
+}
+
+let nextButton = document.getElementById('nextButton');
+let header = document.getElementById('header');
+let moreButton = document.getElementById('moreButton');
+let description = document.getElementById('description');
+let image = document.getElementById('image');
+
+// Make UI match the initial state.
+updateDOM();
+```
+```js data.js
+let sculptureList = [{
+  name: 'Homenaje a la Neurocirugía',
+  artist: 'Marta Colvin Andrade',
+  description: 'Although Colvin is predominantly known for abstract themes that allude to pre-Hispanic symbols, this gigantic sculpture, an homage to neurosurgery, is one of her most recognizable public art pieces.',
+  url: 'https://i.imgur.com/Mx7dA2Y.jpg',
+  alt: 'A bronze statue of two crossed hands delicately holding a human brain in their fingertips.'  
+}, {
+  name: 'Floralis Genérica',
+  artist: 'Eduardo Catalano',
+  description: 'This enormous (75 ft. or 23m) silver flower is located in Buenos Aires. It is designed to move, closing its petals in the evening or when strong winds blow and opening them in the morning.',
+  url: 'https://i.imgur.com/ZF6s192m.jpg',
+  alt: 'A gigantic metallic flower sculpture with reflective mirror-like petals and strong stamens.'
+}, {
+  name: 'Eternal Presence',
+  artist: 'John Woodrow Wilson',
+  description: 'Wilson was known for his preoccupation with equality, social justice, as well as the essential and spiritual qualities of humankind. This massive (7ft. or 2,13m) bronze represents what he described as "a symbolic Black presence infused with a sense of universal humanity."',
+  url: 'https://i.imgur.com/aTtVpES.jpg',
+  alt: 'The sculpture depicting a human head seems ever-present and solemn. It radiates calm and serenity.'
+}, {
+  name: 'Moai',
+  artist: 'Unknown Artist',
+  description: 'Located on the Easter Island, there are 1,000 moai, or extant monumental statues, created by the early Rapa Nui people, which some believe represented deified ancestors.',
+  url: 'https://i.imgur.com/RCwLEoQm.jpg',
+  alt: 'Three monumental stone busts with the heads that are disproportionately large with somber faces.'
+}, {
+  name: 'Blue Nana',
+  artist: 'Niki de Saint Phalle',
+  description: 'The Nanas are triumphant creatures, symbols of femininity and maternity. Initially, Saint Phalle used fabric and found objects for the Nanas, and later on introduced polyester to achieve a more vibrant effect.',
+  url: 'https://i.imgur.com/Sd1AgUOm.jpg',
+  alt: 'A large mosaic sculpture of a whimsical dancing female figure in a colorful costume emanating joy.'
+}, {
+  name: 'Ultimate Form',
+  artist: 'Barbara Hepworth',
+  description: 'This abstract bronze sculpture is a part of The Family of Man series located at Yorkshire Sculpture Park. Hepworth chose not to create literal representations of the world but developed abstract forms inspired by people and landscapes.',
+  url: 'https://i.imgur.com/2heNQDcm.jpg',
+  alt: 'A tall sculpture made of three elements stacked on each other reminding of a human figure.'
+}, {
+  name: 'Cavaliere',
+  artist: 'Lamidi Olonade Fakeye',
+  description: "Descended from four generations of woodcarvers, Fakeye's work blended traditional and contemporary Yoruba themes.",
+  url: 'https://i.imgur.com/wIdGuZwm.png',
+  alt: 'An intricate wood sculpture of a warrior with a focused face on a horse adorned with patterns.'
+}, {
+  name: 'Big Bellies',
+  artist: 'Alina Szapocznikow',
+  description: "Szapocznikow is known for her sculptures of the fragmented body as a metaphor for the fragility and impermanence of youth and beauty. This sculpture depicts two very realistic large bellies stacked on top of each other, each around five feet (1,5m) tall.",
+  url: 'https://i.imgur.com/AlHTAdDm.jpg',
+  alt: 'The sculpture reminds a cascade of folds, quite different from bellies in classical sculptures.'
+}, {
+  name: 'Terracotta Army',
+  artist: 'Unknown Artist',
+  description: 'The Terracotta Army is a collection of terracotta sculptures depicting the armies of Qin Shi Huang, the first Emperor of China. The army consisted of more than 8,000 soldiers, 130 chariots with 520 horses, and 150 cavalry horses.',
+  url: 'https://i.imgur.com/HMFmH6m.jpg',
+  alt: '12 terracotta sculptures of solemn warriors, each with a unique facial expression and armor.'
+}, {
+  name: 'Lunar Landscape',
+  artist: 'Louise Nevelson',
+  description: 'Nevelson was known for scavenging objects from New York City debris, which she would later assemble into monumental constructions. In this one, she used disparate parts like a bedpost, juggling pin, and seat fragment, nailing and gluing them into boxes that reflect the influence of Cubism’s geometric abstraction of space and form.',
+  url: 'https://i.imgur.com/rN7hY6om.jpg',
+  alt: 'A black matte sculpture where the individual elements are initially indistinguishable.'
+}, {
+  name: 'Aureole',
+  artist: 'Ranjani Shettar',
+  description: 'Shettar merges the traditional and the modern, the natural and the industrial. Her art focuses on the relationship between man and nature. Her work was described as compelling both abstractly and figuratively, gravity defying, and a "fine synthesis of unlikely materials."',
+  url: 'https://i.imgur.com/okTpbHhm.jpg',
+  alt: 'A pale wire-like sculpture mounted on concrete wall and descending on the floor. It appears light.'
+}, {
+  name: 'Hippos',
+  artist: 'Taipei Zoo',
+  description: 'The Taipei Zoo commissioned a Hippo Square featuring submerged hippos at play.',
+  url: 'https://i.imgur.com/6o5Vuyu.jpg',
+  alt: 'A group of bronze hippo sculptures emerging from the sett sidewalk as if they were swimming.'
+}];
+
+export default sculptureList;
+```
+</CH.Code>
+
+<br/>
+리액트 모듈 안의 코드와는 세부적으로 차이가 있을 것이나 논리는 일치한다.  
+코드를 훑으면서 과하리 만큼 주석을 남겼기 때문에 이를 중언부언하는 것은 낭비일 것 같다. 대신 먼 훗날 내가 봐서 내가 이해할 수 있게 짧은 요약으로 갈무리한다.
+
+### 컴퍼넌트가 훅을 저장하는 방식
+1. 첫번째 `useState`가 실행되면 이는 컴퍼넌트 훅의 첫번째 요소`componentHooks = [pair0]`로 저장된다. `index`가 `1` 올라간다.  
+2. 두번째 `useState`가 실행되면 이는 컴퍼넌트 훅의 두번째 요소`componentHooks = [pair0, pair1]`로 저장된다. `index`가 `1` 올라간다.  
+3. 반복
+
+### 컴퍼넌트가 훅을 불러오는 방식
+어떤 `setState`에 의해 컴퍼넌트가 리렌더링 되었다. 그 값은 업데이트 되었고,  
+`updateDOM()`이 실행되면서 인덱스는 `0`으로 초기화된다(예시의 아래 포커스 부분).  
+<br/>
+그럼 함수 컴퍼넌트가 재실행 되면서
+<br/>
+1. 첫번째 `useState` 함수가 다시 실행되고, `componentHooks[0]`의 값이 있는지 확인한다. 값이 있으면 저장된 값을 그대로 반환한다. `index`가 `1` 올라간다.  
+2. 두번째 `useState` 함수가 다시 실행되고, `componentHooks[1]`의 값이 있는지 확인한다. 값이 있으면 저장된 값을 그대로 반환한다. `index`가 `1` 올라간다.  
+3. 반복
+
+
+### 세줄 요약
+`useState`를 실행하면 자기만의 `pair(= state & setState())`를 생성한다. 이는 훅이 호출된 순서에 따라 컴퍼넌트를 키로 하는 외부(리액트 모듈)의 배열 안에 차곡차곡 저장된다.  
+<br/>
+`setState()`는 클로저다. 렉시컬 스코프를 이용해 언제나 자기의 파트너 `state`에 접근, 값을 변경시킬 수 있고 후엔 컴퍼넌트의 리렌더링을 유도한다.
+
+<br/>
+<br/>
+#### 참고한 사이트
+[^1]: <Lnk text='How does React know which state to return' href='https://beta.reactjs.org/learn/state-a-components-memory#how-does-react-know-which-state-to-return' />

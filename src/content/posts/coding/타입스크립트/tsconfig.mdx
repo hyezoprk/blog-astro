@@ -1,0 +1,73 @@
+---
+title: tsconfig 5.0
+date: '2023-12-04'
+categories: coding
+tags: 타입스크립트
+description: feat
+series: "Total TS"
+---
+<HeadingNavigator />
+
+### TS 5.0
+
+TS가 5.0으로 오면서 config도 새롭게 추가되거나 합쳐졌다. 매번 할 때마다 긴가민가한 게 있어서 디폴트로 쓰이는 셋팅을 정리해봤다.  
+맷 포콕의 유튜브를 기반으로 타입스크립트 핸드북을 찾아보며 정리했다.
+
+```ts tsconfig.json
+{
+  "compilerOptions": {
+    /* 베이스 옵션 */
+    "esModuleInterop": true,  // .cjs 모듈을 .esm 모듈로 변환한다.
+    "skipLibCheck": true,   // .d.ts 파일의 타입 체크를 하지 않는다. false로 두면 라이브러리의 d.ts 파일도 검사하므로 컴파일 시간에 영향을 끼친다.
+    "target": "es2022",    // 컴파일시킬 JS 버전을 설정한다.
+    "verbatimModuleSyntax": true,  // type 제한자가 없는 import/export에 대해서만 모듈을 그대로 내보냄
+    "allowJs": true,      // .js 파일도 사용할 수 있게 한다(.ts와 병존)
+    "resolveJsonModule": true,   // .json 파일을 모듈로 불러올 수 있다.
+    "moduleDetection": "force",  // "type": "module"과 상관없이 모든 파일을 모듈로 인식한다.
+    "isolateModules": true,   // import나 export가 없는 고립된 모듈의 생성을 막는다.
+    "incremetal": true  // 마지막 컴파일 정보를 저장한다. 이후 해당 정보를 활요ㅕㅇ해 가장 비용이 적게 드는 방식으로 컴파일을 진행한다.
+
+    /* 엄격성 */
+    "strict": true,  
+    "noUncheckedIndexedAccess": true, // 인덱스 시그니처에 해당되는 프로퍼티들에 undefined을 같이 부여한다.
+
+    /* 번들러를 사용하지 않을 경우 트랜스파일링 */
+    "moduleResolution": "NodeNext",  // esm과 cjs 구문 모두 해석한다
+    "module": "ESNext",  // 모듈 시스템을 esm으로 적용한다
+    "outDir": "./dist",   // 컴파일된 파일을 저장할 경로
+    "sourceMap": true,    // js 파일에 대한 소스맵 생성
+
+    /* 번들러를 사용할 경우 트랜스파일링 */
+    "moduleResolution": "Bundler",  // 구문 해석을 번들러에게 위임한다
+    "module": "ESNext",  // 모듈 시스템을 esm으로 사용한다(import를 사용)
+    "noEmit": true,  // js 소스코드, 소스맵 등의 파일을 생성하지 않는다. 즉 컴파일을 하지 않고 타입 체크만 한다. 
+    "jsx": "preserve"   // jsx를 어떻게 컴파일할지 설정한다. preserve는 컴파일하지 않고 내버려둔다. 다른 컴파일러(swc)에서 이를 처리한다.
+
+    /* 돔에서 코드가 실행된다면 (돔이나 윈도우 객체어 접근하는 코드가 있다면) */
+    "lib": ["es2022", "dom", "dom.iterable"],
+
+    /* 돔에서 코드가 실행되지 않는다면 (도큐먼트나 윈도우 객체에 접근하는 코드가 없다면) */
+    "lib": ["es2022"],
+
+    /* 라이브러리를 만들기 위함이면 */
+    "declaration": true,  // .d.ts 파일 생성
+
+    /* 모노레포 라이브러리를 만들기 위함이면 */
+    "composite": true,   // rootDir를 기반으로 프로젝트를 하나의 프로젝트로 인식
+    "declarationMap": true,  // .d.ts 파일에 대한 소스맵 생성
+
+    /* alias 지정을 위한 경로 옵션 */
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["*"]
+    }
+  },
+}
+```
+
+<br/>
+---
+#### 참고문서
+1. <Lnk text='타입스크립트 핸드북' href='https://www.typescriptlang.org/docs/handbook/compiler-options.html' />
+2. <Lnk text='Matt Pocock' href='https://www.youtube.com/watch?v=eJXVEju3XLM' />
+3. <Lnk text='verbatimModuleSyntax in TS 5.0' href='https://jjnooys.medium.com/typescript-5-0%EC%9D%98-verbatimmodulesyntax-7ecb36d833bc' />

@@ -1,0 +1,71 @@
+---
+title: Generic을 이용한 단순화
+date: '2023-02-09'
+categories: coding
+tags: 타입스크립트
+description: feat
+series: "Total TS"
+---
+<HeadingNavigator />
+
+> <figcaption>(Matt Pocock의 강의[^1]를 정리한 시리즈입니다.)</figcaption>
+
+### 상황
+키 인덱스를 통해 `a`로 시작하는 키들의 값만 뽑는 타입이 있다.  
+
+```ts type.ts
+export type Obj = {
+  a: "a"
+  a2: "a2"
+  a3: "a3"
+  b: "b"
+  b1: "b1"
+  b2: "b2"
+}
+
+type ExtractorValueWithA<Obj> = {
+  [K in Extract<keyof Obj, `a${string}`>]: Obj[K]
+}[Extract<keyof Obj, `a${string}`>]
+
+type NewUnion = ExtractorValueWithA<Obj>
+```
+<br/>
+여기서 길게 반복되는 구조가 보이고, 이는 곧장 심기를 자극하는데, (일종의 변수인) 제네릭으로써 이를 잡을 수 있다.  
+<br/>
+<br/>
+
+```ts type.ts
+type ExtractorValueWithA<Obj, Ext = Extract<keyof Obj, `a${string}`>> = {
+  [K in Ext]: Obj[K]
+}[Ext]
+```
+<br/>
+
+짜잔! 긴 코드를 제네릭 안으로 넣어 코드의 반복을 줄였다. 깔끔하군.  
+하지만 아직 이런 에러가 뜨는데  
+<br/>
+
+<Img src='/images/2023/typescript/ExtractorError.webp' />
+<br/>
+
+키로 들어오는 `Ext` 제네릭의 범위가 너무 방대하니 제한해보라는 뜻이다! 갈무리해보면  
+<br/>
+
+```ts type.ts mark=1[31:51]
+type ExtractorValueWithA<Obj, Ext extends keyof Obj = Extract<keyof Obj, `a${string}`>> = {
+  [K in Ext]: Obj[K]
+}[Ext]
+```
+
+Ext의 범위를 Obj의 키로 제한했다.
+
+### 결과
+잘 나왔다. 
+<Img src='/images/2023/typescript/ExtractorResult.webp' />
+<br/>
+`제네릭=변수`라는 데서 두려움을 없애 보자고.. 👏
+
+<br/>
+---
+#### 참고자료
+[^1]: <Lnk text='Total typescript' href='https://www.totaltypescript.com/tips' /> 

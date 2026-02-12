@@ -1,0 +1,144 @@
+---
+title: 파일 업로드
+date: "2023-11-29"
+categories: coding
+tags: "네스트"
+description: 14
+---
+
+<HeadingNavigator />
+
+### Multer
+
+- 멀터를 이용한 방식은 제목, 내용, 이미지를 한번에 받는 방식이다.
+- 클라이언트 입장에서 말하면 모든 폼이 작성된 후 한번의 업로드 요청을 통해 데이터를 서버로 전송하는 것이다.
+- 단순 텍스트는 업로드 속도가 빠르지만, 파일은 오래 걸릴 수 있다.
+- 업로드 버튼을 누른 뒤에 제목, 내용, 이미지가 업로드 된다면 사용자는 딜레이를 경험할 수 있다.
+- 특히나 한번에 여러 개의 이미지를 업로드할 수 있는 기획이라면 업로드 버튼을 누른 후 한참을 기다려야 할 수도 있다.
+
+```ts
+pnpm i multer @types/multer
+```
+- 데이터베이스에는 파일을 직접 저장하지 않는다.
+- 저장하는 것은 문자열 경로뿐이고 실제 파일은 클라우드 스토리지에 저장한다.
+- NestJS에서는 MulterModule을 제공한다.
+- 사용하는 모듈에서 MulterModule을 import하고 `MulterModule.register()`를 사용한다.
+  ```ts common.module.ts
+  @Module({
+    imports: [
+      MulterModule.register({
+        limits: {
+          fileSize: 5 * 1024 * 1024, // 5mb
+        },
+        fileFilter: (req, file, cb) => {
+          const ext = extname(file.originalname);
+          if (!ext.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+            return cb(
+              new BadRequestException(
+                'jpg, jpeg, png, gif, webp 파일만 업로드 가능합니다.',
+              ),
+              false,
+            );
+          }
+          cb(null, true);
+        },
+        storage: multer.diskStorage({
+          destination: (req, file, cb) => {
+            cb(null, TEMP_FOLDER_PATH);
+          },
+          filename: (req, file, cb) => {
+            cb(null, `${crypto.randomUUID()}${extname(file.originalname)}`);
+          },
+        }),
+      }),
+      AuthModule,
+      UsersModule,
+    ],
+    exports: [CommonService],
+    controllers: [CommonController],
+    providers: [CommonService],
+  })
+  export class CommonModule {}
+  ```
+  - limit: 파일 용량 제한 (바이트 단위)
+  - fileFilter: (req, file, cb) => {}
+    - 세번째 아규먼트인 cb는 콜백함수로 첫번째 파라미터에는 에러, 두번째 파라미터엔 파일을 받을지 말지 boolean값을 넣는다.
+    - `extname()`은 파일의 확장자만 추출하는 path의 함수다.
+    - 받아들일 확장자로 필터링을 건다. 정규식을 이용하여 검증하고, 벗어나는 케이스에 대해 에러와 false를 넣은 콜백을 반환한다.
+  - storage: 스토리지를 설정한다.
+
+### 또다른 방식
+- 멀터의 단점은 앞서 언급했다.
+- 새로운 방식은 그의 대안으로, 업로드를 누르는 순간이 아니라 이미지를 선택하는 순간 서버에 요청을 보낸다.
+- 즉 마우스 클릭(선택)이 업로드의 트리거다.
+- 업로드된 이미지는 바로 스토리지에 올라가는 것이 아니라 임시 폴더로 들어간다.
+- 포스트를 업로드할 때는 임시 폴더에 올라갔던 이미지의 경로만 가져와 추가한다.
+- 그 경우 이미지를 `temp` 폴더에서 진짜 스토리지로 이동시키는 로직을 작성한다.
+- 서버에 들어가는 요청은 늘어날지라도 빠르다는 인상을 줄 수 있다.
+- 최종 업로드되지 않은 파일은 `temp` 폴더에 남아 있다. 이는 주기적으로 비워준다.
+- 어떤 엔트리에서 이미지가 필요하든 공용 폴더인 `temp` 폴더로 들어오므로 관리가 용이하다. 그렇지 않은 경우 이미지를 쓰는 모듈마다 multer 관련 세팅을 해야 할 수도 있다.
+
+> <label className='orange' />
+> 1. 다중 파일이 아니라 어차피 하나의 사진만 업로드하는 경우라면 기존 방식이 더 적절할 수 있다.  
+> 2. 만약에 사진을 클릭하고 최종 업로드에 포함하지 않는 경우, 잔여 파일은 `temp`에 남아 있게 된다. 이때 사용되지 않은 파일을 바로 삭제할 수 있지 않나? 그냥 주기적으로 `temp`를 비우는 편이 더 효율적인지. 생각해보기
+
+- 엔드포인트 생성
+  - 어떤 이미지 파일이든 `temp`로 올라가기 때문에 `common` 모듈에 작성한다.
+  ```ts common.controller.ts
+  @Controller('common')
+  export class CommonController {
+    constructor(private readonly commonService: CommonService<BaseModel>) {}
+
+    @Post('image')
+    @UseInterceptors(FileInterceptor('image'))
+    postImage(@UploadedFile() file: Express.Multer.File) {
+      return {
+        fileName: file.filename,
+      };
+    }
+  }
+  ```
+  - 클라이언트에서는 사진을 클릭(선택)할 때마다 이 경로로 POST 요청을 보내도록 작업한다.
+
+- DTO에 이미지 필드 추가
+  - image 필드를 DTO에 추가해 관리한다.
+  ```ts create-post.dto.ts
+  export class CreatePostDto extends PickType(PostModel, ['content', 'title']) {
+    @IsString({
+      each: true,
+    })
+    @IsOptional()
+    images?: string[] = [];
+  }
+  ```
+
+- 임시 폴더에서 스토리지로 이동 시키기
+  - 최종 업로드된 이미지는 `tmp` 폴더가 아닌 스토리지 폴더에 저장돼야 한다.
+  - 그러니까 업로드 버튼을 누른 요청에서, 최종 낙점된 이미지는 스토리지 폴더로 이동돼야 한다.
+  ```ts
+  async createPostImage(dto: CreatePostDto){
+    const tmpFilePath = join(TEMP_FOLDER_PATH, dto.path);
+
+    try {
+      // 해당 경로의 파일이 존재하는지 확인
+      await promises.access(tempFilePath);
+    } catch (error) {
+      throw new BadRequestException('파일이 존재하지 않습니다.');
+    }
+
+    // 파일의 이름+확장자만 가져온다
+    const fileName = basename(tempFilePath);
+    const newPath = join(POSTS_IMAGE_PATH, fileName);
+
+    const result = await repository.save({
+      ...dto,
+    });
+
+    await promises.rename(tempFilePath, newPath);
+    return result;
+  }
+  ```
+  - fs의 `promises.access()`는 경로를 넣었을 때 해당하는 파일이 존재하는지 체크하고 없다면 에러를 던진다.
+  - path의 `basename()`은 경로에서 파일의 이름+확장자만 가져온다.
+  - fs의 `promises.rename()`은 첫번째 파라미터로 넘긴 경로의 파일을 두번째 파라미터로 넘긴 경로로 이동시킨다.
+  - 그러면 이미지 파일이 스토리지 폴더로 이동하고, 뒤이은 응답 로직을 처리할 수 있게 된다.

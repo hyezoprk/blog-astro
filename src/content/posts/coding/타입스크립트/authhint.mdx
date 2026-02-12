@@ -1,0 +1,73 @@
+---
+title: Autohint
+date: '2023-01-30'
+categories: coding
+tags: 타입스크립트
+description: feat
+series: "Total TS"
+---
+
+> <figcaption>(Matt Pocock의 강의[^1]를 정리한 시리즈입니다.)</figcaption>
+
+### 자동완성 힌트의 보완
+
+타입스크립트의 장점 중 하나는 자동완성 기능이다. 리터럴 타입을 마련해놓으면 선택에 제한을 거는 동시에 힌트를 받을 수 있다.  
+그런데 자동완성 타입을 확장하려고 때 소소한 문제가 생긴다. 가령 사이즈 `sm | md`를 프롭스로 받는 컴퍼넌트를 예로 보면
+<CH.Spotlight>
+```ts index.ts
+type IconSize = "sm" | "md"
+
+interface IconProps {
+  size: IconSize;
+}
+```
+---
+- 타입을 확장하려 할 때, `string`이 다른 둘을 아우르기 때문에 그를 잡아먹게 된다.
+```ts index.ts focus=1[17:36] mark=1[31:36]
+type IconSize = "sm" | "md" | string;
+
+interface IconProps {
+  size: IconSize;
+}
+```
+---
+- 그럼 기존에 있었던 자동완성 힌트의 혜택도 사라진다.
+```ts result.tsx
+export const Icon = ({size}: IconProps) => {
+  return <></>;
+}
+  
+const Component1 = () => {
+  return (
+    <>
+      <Icon size="sm" />
+      // focus
+      <Icon size=" ? " />
+    </>  
+  );
+};
+```
+---
+- 해결방법은 역으로 `string`에서 둘을 다시 뱉어내는 것
+```ts index.ts
+// focus
+type IconSize = "sm" | "md" | Omit<string, "sm" | "md">;
+
+interface IconProps {
+  size: IconSize;
+}
+```
+---
+- 제네릭으로 도식을 다듬을 수 있다.
+```ts index.ts
+type LooseAutocompletion<T extends string> = T | Omit<string, T> 
+type Iconsize = LooseAutocompletion<"sm" | "md">
+```
+</CH.Spotlight>
+
+그러면 `sm`, `md` 외의 문자열을 넣을 수 있으면서도 자동완성 힌트를 받을 수 있다.
+
+<br/>
+---
+#### 참고자료
+[^1]: <Lnk text='Total typescript' href='https://www.totaltypescript.com/tips' /> 

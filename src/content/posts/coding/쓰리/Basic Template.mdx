@@ -1,0 +1,220 @@
+---
+title: '[Three-2D] Basic Template'
+date: "2023-09-01"
+categories: "coding"
+tags: "쓰리제이에스"
+description: "Intro"
+---
+
+<HeadingNavigator />
+
+이번 편의 주제는 베이직 템플릿이다. 말 그대로 베이직, `Three`의 기본 인스턴스들을 활용하여 템플릿을 만드는 게 목표다.
+<br/>
+무작정 시작하기에 앞서 알아야 것들이 있다. 특히 `shader`에 관한 내용이 그런데[^1], 나는 멋모르고 부닥쳤지만 안 그러면 훨씬 좋았을 거다. 정확하진 않을 수 있지만 공부하고 이해한 바를 일단 서술해본다.
+<br/>
+---
+<br/>
+1. Three의 기본 구성요소
+- Scene: 오브제들을 담는 컨테이너다. 일반적으로 의미하듯 하나의 장면, 하나의 씬을 의미한다.
+- Object: 화면에 담길 피사체다. 피사체는 형태와 성질로 결합되는데, 형태는 `geometry`로, 성질은 `material`로 정의한다. `Mesh`는 이 둘을 결합이다.
+- Camera: 사용자의 시점이다. 오브제를 바라볼 각도, 오브제를 담을 범위 등을 정의한다. 꼭 한개가 아니라 여러 개가 쓰일 수 있다.
+- WebGLRenderer: Scene과 Camera를 결합해 실제로 렌더링한다. 무대와 카메라가 준비됐으니 촬영에 들어가는 단계라고 볼 수 있다. 버튼은 `render` 메써드다. 호출하면 한 장의 사진이 찍히는데, 동영상(애니메이션)을 위해서는 `requestAnimationFrame`으로 반복해서 호출한다.
+<br/>
+
+2. Shader
+- Shader: 쉽게 말해 그래픽을 그리는 방법이다. 파일 확장자는 `glsl`이다. `vertexShader`와 `fragmentShader`로 구성된다.
+- vertexShader: 3차원 좌표로 이루어진 vertex들이 2차원 화면에서 그려질 위치를 정의한다. 즉 꼭지점의 구성, 자리잡음을 담당한다. 브라우저 화면이 2D이기 때문에 필요한 시각적 치환 과정이다. 아래 그림의 두번째를 참고. <Img src='/images/2023/three/shader.jpeg' />
+> 👀 <b>vertexShader에 주어지는 기본 변수</b>: <u>projectionMatrix</u> & <u>modelViewMatrix</u>
+>
+> vertexShader에서는 꼭지점들의 위치를 정의해줘야 한다. 이 설정을 위해 주어지는 변수가 있다!
+> - projectionMatrix: 오브제의 포지션, 크기, 움직임을 2차원 뷰포트에 투영하는 변수
+> - modelMatrix: 모델(오브제)의 이동, 회전, 크기 등 변형값을 계산하는 변수
+> - viewMatrix: 카메라의 배치를 조정하여 화면의 시점을 계산하는 변수
+> ---
+> - 둘다 기본적으로 계산돼서 주어지지만, RawMaterialShader를 사용할 때는 이 둘을 명시적으로 선언한 뒤 직접 계산해야 한다.
+> - 순서를 바꿔서도 안 된다. 반드시 projectionMatrix가 제일 앞으로 와야 한다.
+> - 셰이더의 곱셈 순서는 일반적으로 projectionMatrix * modelViewMatrix * position 이다. 이 값을 정해진 변수 <u>gl_position</u>에 할당하면(이 매트릭스는 -1부터 1의 좌표 범위를 갖는다) 꼭지점들이 화면에 나타날 위치가 결정된다.
+> - 마찬가지로 <u>gl_PointSize</u>는 꼭지점들의 크기를 정의한다.
+> - 가령 곱셈 파이프라인에서 viewMatrix를 빼면 카메라 시점을 조정하지 못한다.
+> <Img src='/images/2023/three/vertexShader1.png' />
+
+- `fragmentShader`: vertex 위치를 기반으로 만들어지는 단면적에 관여하는 셰이더다. 단면적을 차지하는 픽셀 하나하나의 색상, 그림자, 중력 및 분산 등 연산을 통해 여러 가지 이펙트를 만들어낸다. 윗 그림의 네번째를 보자.
+- 그 밖에..
+> <b>glsl 변수타입</b>
+> - attribute: geometry에 속하는 어트리뷰트. geometry.setAttribute(name, value)로 설정한다. 주의할 점은 vertexShader에서만 쓸 수 있고, fragmentShader에서는 attribute 변수에 대한 접근이 불가능하다.
+> - uniform: material에 속하는 프로퍼티. material.uniforms.name.value = value로 설정한다. vertexShader와 fragmentShader에서 모두 쓸 수 있다.
+> - varrying: vertexShader에서 fragmentShader로 값을 전달할 때 사용한다. vertexShader에서 선언과 할당을 마치면 fragmentShader에서도 이 값에 접근할 수 있다.
+> ---
+> <b>geometry의 디폴트 attribute</b>
+> - vec3 position: 3차원에서 꼭지점의 위치.  
+> - vec3 normal: 3차원에서 각 꼭지점이 가진 방향성(머리와 꼬리)  
+> - vec2 uv: 2D 텍스쳐를 3D 모델에 입히기 위해 계산되는 값. 0 ~ 1 사이의 값이다.  
+
+#### 중간정리
+- <u>vertex</u> -> GPU : 우리 여기에 있어! 위치 알리미
+- <u>fragment</u> -> GPU : 우리 이렇게 채워줘! 색칠 알리미
+- geometry <u>attribute</u> -> 프레임워크에 의해 vertex shader에만 전달/제공
+- material <u>uniform</u> -> vertex shader, fragment shader 모두에게 전달/제공
+- <u>varrying</u> -> vertex shader에서 선언, 할당되어 fragment shader로 공유
+- 그리고 문과적인 tip
+> <b>정규화는 언제 쓰는가?</b>
+> - 정규화는 벡터의 길이를 1로 만든다. 길이가 1이면 벡터가 의미하는 것은 방향이다.
+> - 그럴 때 `dot`의 역할은? 방향을 나타내는 두 인수(카메라와 피사체)를 포개어 일치하면 1, 90도라면 0을 리턴한다.
+
+> <b>그 외 함수들로 노리는 효과</b>
+> - abs: 대칭 효과
+> - step: 대비 효과(0 아니면 1인 스위치)
+> - mix / clamp / smoothstep: 그라디언트 효과(선형보간)
+> - normalize: 방향 계산
+> - fract: 컬러 계산 (0~1의 소수값)
+> - dot: 그림자(빛) 계산
+
+
+<br/>
+--- 
+
+### 설치
+
+```bash
+pnpm i -D three
+```
+
+```js sketch.js
+import * as THREE from 'three';
+import { OribitControls } from 'three/examples/jsm/controls/OrbitControls.js'; // 마우스 카메라 컨트롤
+import vertexShader from './shaders/vertex.glsl';
+import fragmentShader from './shaders/fragment.glsl';
+```
+
+### 클래스 작성
+설치가 됐다면 클래스를 작성한다. 앞장에 더해 다음의 메써드가 추가됐다.
+- `addObject`: 오브제 셋팅을 처리
+- `resizeSetup`: 이벤트리스너 셋팅을 처리
+<br/>
+전체 코드를 훑어보고 세부적인 내용을 살펴보자.
+
+```js sketch.js
+export default class Sketch {
+  constructor(options) {
+    this.container = options.dom;
+    this.scene = new THREE.Scene();
+
+    this.width = this.container.offsetWidth;
+    this.height = this.container.offsetHeight;
+
+    this.renderer = new THREE.WebGLRenderer();
+    this.renderer.setClearColor(0x222222, 1);
+    this.renderer.setSize(this.width, this.height);
+    this.container.appendChild(this.renderer.domElement); // <canvas />
+	
+    this.camera = new THREE.PerspectiveCamera(70, this.width / this.height, 0.01, 10);  // 렌즈각, 뷰파인더 비율, 최소 z값, 최대 z값 
+    this.camera.position.z = 1;
+    
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    
+    this.resizeHandler = this.resize.bind(this);
+
+    this.time = 0; 
+		
+    this.addObjects();
+    this.resizeSetup();
+    this.render();
+  }  // 컨스트럭터
+  
+
+  addObjects(){
+    this.geometry = new THREE.PlaneGeometry(1, 1, 10, 10);
+    this.position = // 다음 시간에 정의한다.
+    this.uv = // 다음 시간에 정의한다.
+    
+    this.material = new THREE.ShaderMaterial({
+      vertexShader,
+      fragmentShader,
+      uniforms: {
+        uTime: { value: 0 };
+        uTexture: { value: this.positions }, 
+      },
+      wireFrame: true,
+    })q
+
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.scene.add(this.mesh);
+  }
+  
+  render(){
+    this.time += 0.05;
+    this.material.uniforms.time.value = this.time;
+    
+    this.mesh.rotation.x = this.time / 20;
+    this.mesh.rotation.y = this.time / 10;
+    
+    this.renderer.render(this.scene, this.camera);
+    
+    this.rafId = requestAnimationFrame(this.render.bind(this))
+  }
+
+  resize() {
+    this.width = this.container.offsetWidth;
+    this.height = this.container.offsetHeight;
+
+    this.renderer.setSize(this.width, this.height);
+    this.camera.aspect = this.width / this.height;
+
+    this.camera.updateProjectionMatrix();
+	}
+  
+  // 셋업
+  resizeSetup(){
+    addEventListener('resize', this.resizeHandler);
+  }
+
+  clearSetup(){
+    removeEventListener('resize', this.resizeHandler);
+    cancelAnimationFrame(this.rafId);
+  }
+}
+```
+
+### addObjects
+`addObjects`는 오브제 등록을 담당한다. 오브제(피사체)는 형태와 성질의 결합이다. `geometry`와 `material`를 만들고 `Mesh`로 결합하여 완성한다.
+- planeGeometry: 사각형 평면 도형이다. 네 개의 파라미터는 각각 `width`, `height`, `widthSegments`, `heightSegments`를 의미한다. 앞의 두 인자로 전체적인 크기를 조정하고, 뒤의 두 인자로 그 안을 채우는 작은 fragment들의 사이즈를 정의한다(<Lnk text='링크' href='https://threejs.org/docs/#api/en/geometries/PlaneGeometry' />).
+- ShaderMaterial: 셰이더를 사용하는 material이다. `wireFrame`을 `true`로 설정하면 도형을 뼈대(scaffold)로 표시하게 만든다. 개념에서 살펴본 `vertexShader`, `fragmentShader`, `uniform` 등을 여기서 전달할 수 있다(<Lnk text='링크' href='https://threejs.org/docs/#api/en/materials/ShaderMaterial' />).  
+- vertexShader
+```glsl vertex.glsl
+varying vec2 vUv;
+uniform float uTime;
+uniform sampler2D uTexture;
+
+void main() {
+  vUv = uv;   // 기본 속성 uv는 read-only
+  vec3 newpos = position; // 기본 속성 positon은 read-only
+  newpos.x += 0.5;
+
+  vec4 mvPosition = modelViewMatrix * vec4(newpos, 1.0);
+
+  gl_PointSize = (10.0 / -mvPosition.z);
+  gl_Position = projectionMatrix * mvPosition;
+}
+```
+> - newpos의 x축을 늘리면 오른쪽으로 이동하지만, 다음 렌더시에는 초기화된다.
+> - glsl의 매실행은 독립적이다. 이전 실행값을 캐싱하지 못한다. 이전 실행값을 저장하고 싶으면 js 쪽에서 값을 업데이트한 뒤, uniform 변수로 넘긴다.  
+> 다음 시간에 position 데이터를 만들고 업데이트 하는 방법을 살펴볼 것이다.
+
+- fragmentShader
+```glsl fragment.glsl
+varying vec2 vUv;
+uniform sampler2D uTexture;
+
+void main() {
+  vec4 color = texture2D(uTexture, vUv);
+  gl_FragColor = color;
+}
+```
+
+### setup
+- `resizeSetup`: 브라우저의 사이즈를 조정할 때마다 `resize` 메써드가 실행되게 한다. 컨테이너의 `width`, `height`가 갱신되면서 `renderer` 사이즈, `camera`의 비율도 재계산된다.
+<br/>
+---
+<br/>
+#### 참고한 문서
+[^1]: <Lnk text='The Book of Shader' href='https://thebookofshaders.com/01/?lan=kr' />

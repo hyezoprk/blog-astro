@@ -1,0 +1,50 @@
+---
+title: 커스텀 데코레이터
+date: "2023-11-23"
+categories: coding
+tags: "네스트"
+description: "09"
+---
+
+<HeadingNavigator />
+
+### 커스텀 데코레이터
+<small>-Custom Decorators</small>
+
+NestJS에서는 커스텀 데코레이터를 만드는 함수를 제공한다. 커스텀 데코레이터는 `@Param`, `@Body` 등과 같이 파라미터 안에서 사용된다. 일단 함수를 만들면 파라미터로 `context`를 받는데 가드처럼 Reqeust 객체에 접근한다. 그리고 이 시점은 가드와 인터셉터를 통과한 다음이다. req에서 이전에 넣어둔 정보를 찾아 원하는 값만(가령 User) 반환할 수 있다.  
+<br/>
+- <b>createParamDecorator()</b>
+  - 첫번째 파라미터(data)에는 데코레이터로 들어오는 첫번째 인자가 담긴다.
+  - 사용처에서 `@User('id')`를 작성했다면 data는 'id'다.
+  - 즉 첫번째 파라미터는 반환하려는 데이터의 키값을 받는다(keyof UserModel).
+  - 만약 파라미터로 키값이 받으면 그에 해당하는 `value`만 반환하게 한다.
+  - 아니라면 원래 보내려던 객체를 반환한다.
+  ```ts
+  export const User = createParamDecorator((data: keyof UserModel, context: ExecutionContext) => {
+    const req = context.switchToHttp().getRequest();
+    const { user } = req;
+
+    if(!user)
+      throw new InternalServerErrorException('User Decorator는 엑세스토큰 가드와 사용해야 합니다.');
+
+    if(data) return user[data];
+
+    return user;
+  });
+  ```
+  - 이 유저 데코레이터는 엑세스토큰 가드와 함께 사용한다는 가정에서 작성되었다.
+  - 이 데코레이터가 실행된 시점에 유저 정보를 req에서 찾을 수 없다면 그건 클라이언트 문제가 아니라 서버 문제다. 액세스토큰 가드를 통과했다면 유저 정보는 무조건 존재해야 하고, 없다면 가드를 빼먹었거나 가드가 잘못됐다는 의미이기 때문이다.
+  - 이제 `@Request` 객체 전체에 접근할 필요 없이 `@User` 데코레이터를 통해 유저 정보를 받을 수 있다.
+  ```ts
+  @Delete(':id')
+  @UseGuards(AccessTokenGuard)
+  deletePost(
+    @Param('id', ParseIntPipe) id: number,
+    @User() user: UserModel,
+  ) {
+    return this.postsService.deletePost(id);
+  }
+  ```
+<br />
+#### 참고링크
+1. <Lnk text='Custom Decorators' href='https://docs.nestjs.com/custom-decorators' />

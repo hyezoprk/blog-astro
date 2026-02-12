@@ -1,0 +1,118 @@
+---
+title: "Typescript <Omit>"
+date: "2022-07-21"
+categories: "coding"
+tags: "타입스크립트"
+description: "Init"
+excerpt: "사랑해요 @mattpocock"
+image: "/images/2022/summer/typescript_image.png"
+---
+<HeadingNavigator />
+타입스크립트 본격적으로 쓴 지 한달째. 잘 가고 있는 걸까 물으면 솔직히 모르겠다ㅋㅋ 맨날 기본에서 기본만 겉도는 느낌.. 한결 익숙해져서라고 믿고 싶다 😢
+<br/>
+아무튼 오늘은 자주 쓰는 모듈들을 한데 모아 커스터마이징 했다. 그 과정에서 이런 타입 에러를 맞딱드렸고
+<Img src={'/images/2022/summer/typeError1.png'}/>
+이걸 푸는 것이 오늘의 얘기다ㅎ
+<br/>
+<br/>
+<br/>
+
+### 발단
+간단히 말해 부모타입에서 필수로 요했던 children을 내 쪽에서 옵셔널하게 바꾸면서 생긴 오류였다 🤔   
+interface는 기존 정의에 새로운 값을 추가하는 데엔 관대하지만, 이렇듯 뭔가로 기존값을 다르게 덮어쓰면 돌을 던진다.
+<CH.Scrollycoding rows={11}>
+  문제가 된 부분 👾
+  ```ts MdxComponents.tsx focus=4 
+  interface NotationProps extends RoughNotationProps {
+    text: string;
+    css?: string;
+    children?: React.ReactNode;
+  }
+  ```
+  ---
+  *children*을 생략하고 싶었다
+  ```ts Mdx....tsx mark=2[29:41]
+  // RoughNotation
+  export const Note = (props: NotationProps) => {
+    const [isCalled, setIsCalled] = useState(false);
+    useEffect(() => setIsCalled(true), []);
+    return (
+      <RoughNotation
+        show={isCalled}
+        ......
+        {...props}
+      >
+      // mark
+        {<span className={props.css}>{props.text}</span>}
+      </RoughNotation>
+    );
+  };
+  ```
+</CH.Scrollycoding>
+어떻게 하면 될까?
+<br/><br/><br/>
+
+### 방법은 Typescript의 〈Omit〉
+- 타입스크립트의 유틸타입 중 하나
+- 타입을 extends 해올 때 <Note animationDelay={1000}>특정키 값을 제외</Note>하고 상속받는다
+<br/>
+공식문서 둘러볼 때 이놈은 필히 쓰겠다 싶더랬다.[^1] 사용법은 간단하다.
+```ts Mdx....tsx mark=2[33:68]
+// children을 제외하고 extends 해온다.
+interface NotationProps extends Omit<RoughNotationProps, "children"> {
+  text?: string;
+  css?: string;
+  className?: string;
+  children?: React.ReactNode;
+} 
+```
+<br/><br/><br/>
+### 제네릭이 어떻게 짜여있길래?
+이를 이해하기 위해선 다른 유틸 타입인 <a>Pick</a> 과 <a>Exclude</a> 의 쓰임을 먼저 알아야 했다. 내가 단박에 파악할 깜냥은 안 돼서 다른 분의 설명을 참고했고, 많은 도움이 됐다. 자세한 설명이라면 그분 걸 참고하는 게 나을 것 같다.[^2] 나는 내가 적고 내가 이해하는 데 아무래도 좀 더 주안을 두기 때문이다.  
+<br/>
+아무튼 말로 풀면 Omit은 Pick의 반대, 부정형이다. Pick이 제네릭을 통해 조건에 해당되는 값을 가져온다면 Omit은 그것을 제외한 모든 값을 들고 온다. 구조는 동일하다. 단지 <a>Pick〈대상, +조건〉</a>에서 '플러스'였던 조건을 '-조건'으로 바꾼 것이 Omit인 거다. 그리고 그런 부정논리를 만들어주고 있는 녀석이 Exclude다.  
+간략하게나마 이를 살펴보자
+<br/>
+<br/>
+<hr/>
+<br/>
+
+**1. Exclude〈대상, 제외하려는 값〉**  
+  일련의 유니온 타입이 나열되어 있을 때 특정 타입을 제외하여 돌려준다. 가령 제네릭의 첫번째 인자가 "A" | "B" | "C" 를 나열한 타입이라고 치자. 그러면 두번째 인자로 들어오는 "B"는 "A" | "C" 를 반환하게 만든다.  
+    - _`type Exclude<T, K> = T extends K ? never : T`_
+    - extends는 이꼴(=)이다. 조건문에서는 '겹치면', 또는 '속하면'으로 읽어주는 편이 낫다.  
+    : "T중에 K랑 겹치는 애면 없는 셈치고 나머지만 남겨주라"
+<br/>
+<br/>
+  
+**2. Pick〈대상, 남기려는 값〉**  
+오브젝트 타입에서 특정 키(와 타입)을 뽑아낸다.  
+<a>keyof</a>는 오브젝트에서 키값을 뽑아내 유니언 타입으로 나열해주는 오퍼레이터다.[^3] Pick은 그의 도움을 받아 다음과 같이 이루어진다.
+```ts sample.ts
+type Pick<T, K extends keyof T> = { // 조건: 원본 T의 키에서 K와 일치하는 키들을
+  [NewKey in K]: T[NewKey] // 새로이 키값으로 삼고, 그 타입도 원본 참조하여 가져옴
+}
+```
+<br/>
+<br/> 
+**3. Omit〈대상, 제외하려는 값〉**  
+오브젝트 타입에서 특정 키(와 타입)을 제외한 모든 값을 반환한다. 앞서 말했지만 이는 결국 Pick을 들고 그 안의 조건을 뒤집는 것이다. 그 과정을 살펴보면
+   1. keyof T를 통해 유니언 타입을 추출하고,
+   2. 그에 대해 Exclude를 이용해 K를 제외한 모든 값을 남긴다.
+   3. 그리고 Pick은 이 모두를 조건으로 받는다.  
+
+제네릭 표현을 보면 쉽게 이해할 수 있을 것 같다.
+```ts sample.ts
+type Omit<T, K> = Pick<T, Exclude<keyof T, K>>
+// Exclude<keyof T, K>의 결과, K의 값을 제외한 모든 T가 남고
+// 이를 Pick 하는 것이 Omit.
+```
+<br/>
+<hr/>
+<br/>
+
+
+#### 참고한 사이트
+[^1]: <Lnk text='타입스크립트 공식문서: util types' href={'https://www.typescriptlang.org/docs/handbook/utility-types.html'} />
+[^2]: <Lnk text={'Omit 메커니즘 이해하기'} href={'https://yceffort.kr/2022/03/typescript-omit-exclude-pick'} />
+[^3]: <Lnk text='타입스크립트 공식문서: keyof' href={'https://www.typescriptlang.org/docs/handbook/2/keyof-types.html#handbook-content'} />

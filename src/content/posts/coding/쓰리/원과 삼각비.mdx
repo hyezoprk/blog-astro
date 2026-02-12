@@ -1,0 +1,112 @@
+---
+title: 원과 삼각비
+date: '2024-05-01'
+tags:
+  - 쓰리제이에스
+categories: coding
+description: study
+pinned: true
+---
+
+### WebGL과 수학 공식
+
+수학을 잘하지도, 놓고 산 지도 오래인 문과충 나... 그럼에도 WebGL 욕심은 있어서 관심을 놓지 않기로 다짐했다.
+
+우선 기본으로 여겨지는 삼각함수부터, 밑바닥부터 다져야 한다.
+
+### 삼각함수와 원의 관계
+<Youtube src='https://www.youtube.com/embed/vT5pQ0-gqJU?si=ZSieDckgzj6crYao' />
+<br/>
+
+> "싸인과 코싸인을 이해한다는 것은 원과 삼각형의 관계를 이해하는 것과 같습니다."
+> <cite>위 유튜브 中</cite>
+
+
+일단 어떤 원의 반지름을 빗변으로 가지는 직각 삼각형을 상상해보자. 이 삼각형은 직각 삼각형이기 때문에 삼각함수의 지배를 받는다. 이때 쉬운 계산을 위해 반지름 r의 길이를 1로 둔다. 그러면 이 원주의 특정 위치(점)에 대한 좌표를 쉽게 구해낼 수 있는데, 필요한 건 각도 세타(𝜃) 뿐이다.
+
+여기서 삼각함수가 말해주는 것은 다음과 같다. **빗변의 길이가 1이고 각도가 𝜃일 때, 삼각형 밑변의 길이는 cos(𝜃), 높이는 sin(𝜃)이라는 것이다**. 중요한 건 코사인은 x 좌표, 싸인은 y 좌표에 관여한다는 것을 이해하는 것이다. 이 둘은 각각 x 좌표, y 좌표에 대응하며 해당 원주에 접근하는 좌표값을 제공한다.
+
+
+### Demo
+
+우선 그리드 중심에 원점을 나타내는 공을 하나 만들어보자
+```js
+var mesh = new THREE.Mesh(
+	new THREE.SphereGeometry(0.01, 32, 32);
+	new THREE.MeshNormalMaterial();
+);
+
+function addPoint(x, y, z){
+	var point = mesh.clone();
+	point.position.set(x, y, z);
+	scene.add(point);
+
+	return point;
+}
+
+addPoint(0, 0, 0);
+```
+
+
+만들어졌다면 이 공을 중점으로 한 가상의 원을 상상한다. 꼭 놀이동산의 대관람차처럼 말이다. 위에서 배운 삼각함수 법칙으로 그 원주에 위치하는 점들을 일일이 찍어낼 수 있다
+
+다시 기억하면, 이때 필요한 건 오직 세타(𝜃)다. 세타를 설정하는 데는 다음이 필요한데, 부연하자면,
+- Math.PI * 2: 원 한바퀴(360도)의 radian값은 2π이다. 이를 기준으로
+- i/number: 0에서 1 사이의 값을 곱해 원의 각도를 균등하게 분할한다
+
+그러면 반복문으로 각각의 각도(그로인해 각각의 좌표)를 가진 공을 얻을 수 있다. 후에 애니메이션을 가미하기 위해 객체로 포장하여 하나의 배열에 담아두도록 한다.
+```js
+var number = 30;
+var objects = [];
+
+for (let i = 0; i < number; i++){
+	let theta = (i/number) * Math.PI * 2;
+	let x = Math.cos(theta), y = Math.sin(theta), z = 0;
+	let mesh = addPoint(x, y, z);
+
+	let newBall = {
+		mesh,
+		theta,
+		x: Math.random() / 5,
+		y: Math.random() / 5,
+		z: Math.random() / 5,
+	}
+
+	objects.push(newBall)
+}
+```
+
+그러면 대관람차 모양의 배치가 완성된다.
+<Img src='/images/2024/대관람차.png' />
+
+
+밋밋하니 다음과 같은 애니메이션을 추가해보자.
+
+```js
+// animation
+function animation(time){
+	objects.forEach(function 공전(ball){
+		let {mesh, theta, x, y, z} = ball;
+		let newTheta = theta + time / 1000;
+		let nx = Math.cos(newTheta) + x;
+		let ny = Math.sin(newTheta) + y;
+		let nz = z;
+
+		mesh.position.set(nx, ny, nz);
+	});
+
+	mesh.rotation.x = time / 2000;
+	mesh.rotation.y = time / 1000;
+
+	renderer.render(scene, camera);
+}
+```
+
+적용된 코드들의 효과는 이러하다
+- 새로운 세타: 시간이 갈 때마다 세타의 값에 상수를 더한다. 값(각도)을 추가하더라도 싸인과 코싸인은 일정한 파동을 그리면서 궤적을 이탈하지 않는다. 즉 원을 순환하면서 무한히 회전하는 움직임을 보이게 된다.
+- 새로운 포지션: 기존의 x, y, z 가 정적으로 고정된 위치에 있었기 때문에 Math.random() 값을 더하여 불규칙적으로 이탈하게 한다. 자유도를 부여하는 작업이고 나누기의 값으로 정도를 조정한다.
+<br/>
+---
+그러면 아쿠아맨이 쓸 법한 물의 고리가 완성된다. 스크린샷은 number를 30으로 두고 찍었는데 사이즈를 키울수록 좀 더 있어 보인다
+
+<Img src='/images/2024/대관람차 회전.gif' />

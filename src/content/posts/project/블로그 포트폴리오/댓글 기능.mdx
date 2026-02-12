@@ -1,0 +1,163 @@
+---
+title: 댓글 기능 추가 (Prisma+GraphQL)
+date: '2022-10-27'
+categories: project
+tags: "블로그 포트폴리오"
+description: feat
+---
+<HeadingNavigator />
+
+### 도입 배경
+Prisma 공부를 하긴 했는데 막상 적용을 하자니 엄두가 안 났다. 그럴 땐 언제나 친숙한 것부터.. 나는 해보고 싶은 건 일단 블로그에 시도해보는 것 같다. 다른 프로젝트도 해야 하는데, 하나라도 잘하자는 강박이 좀 고질적인 문제;;
+<br/>
+아무튼 처음부터 댓글을 만들려던 건 아니었다. 네이버 블로그를 할 때도 댓글은 닫고 살았고, 뭣보다 그냥 댓글창들이 안 예쁘다고 생각했다. 특히 `utterance` 같은 것의 구현은 정말 복붙이기 때문에 실력 늘리는 거랑은 별 상관없다고 생각하기도 했고.
+<br/>
+<Img src='/images/2022/autumm/스샷_Vercel.webp' />
+<br/>
+
+그래서 하려던 것이 `웹소켓`으로 1대1 채팅 기능을 심는 거였다. 헌데 `Vercel` 측에서 말하길 서버리스 환경에서 웹소켓 구현은 힘들다고. 결국 물꼬를 틀어 댓글 기능을 만들어보는 것으로 방향을 텄다. 막상 해보니 잘한 결정이었던 것 같다.  
+<br/>
+때마침 즐겨듣는 유튜버 <q>카일</q>의 Nested Comment 영상이 있었다. 항상 느끼지만 설명을 진짜 잘한다. `GraphQL`이나 `NextAuth`를 다루지는 않지만 그건 내가 할 일이고, 그의 로직에 많은 빚을 졌다.  
+<br/>
+기본적인 CRUD 기능을 연습하기 좋았고 그큐엘의 쿼리 메커니즘에도 한결 익숙해질 수 있었다.  
+
+### Postgres + AWS 선정 이유
+딱히 없다.  
+나는 우선 `Nextauth`로 로그인 기능부터 구현했는데 거기서 대표로 소개되고 있던 db가 RDBS에서 `PostgreSQL`, NoSQL에선 `MongoDB`였다.  
+처음에는 그냥 익숙하니까 `MongoDB`(Atlas)에서 작업했는데, DB의 근본인 관계형 데이터베이스도 궁금해서 바꿔탔다.  
+하지만 `prisma`를 쓰는 만큼 사용상에서 둘의 차이를 느끼긴 힘들었다. 몽고디비 쓸 땐 아 오브젝트구나 싶었던 걸 이제 아 테이블이구나 하는 처참한 수준ㅋㅋ😣 
+
+### Apollo GraphQL
+아폴로 서버의 `context` 자리는 그큐엘 `resolvers`의 세번째 인자로 들어오는, 매우 유용한 꿀단지 자리다🍯 <q>NextAuth</q>의 `session`과 <q>prisma</q>의 `client`를 이곳에 넣어주면 일이 되게 쉬워진다.
+```ts graphql.ts focus=9:11
+import prisma from "@/lib/graphql/prismadb";
+import { getSession } from "next-auth/react";
+...
+
+const apolloServer = new ApolloServer({
+  schema,
+  csrfPrevention: true,
+  cache: "bounded",
+  context: async ({ req }): Promise<GraphqlContext> => {
+    const session = await getSession({ req });
+    return { session, prisma };
+  },
+});
+```
+<br/>
+> 간단한 예시로 보면 <q>세션 데이터</q>는 이렇게 로그인 검증이나 프리즈마 <q>relation</q>의 이음새로 두루두루 쓰이게 된다.  
+<CH.Code>
+```ts ../resolvers/comments.ts
+import { CreateCommentResponse, GraphqlContext, Root } from "@/types";
+const resolvers = {
+  ...
+
+  Mutation: {
+    createComment: async (
+      _: Root,
+      args: { message: string; postId: string },
+      context: GraphqlContext,
+    ): Promise<CreateCommentResponse> => {
+      const { message, postId } = args;
+      const { session, prisma } = context;
+
+      if (!session?.user)
+        return {
+          error: "로그인 해주세요",
+        };
+
+      try {
+        await prisma.comment.create({
+          data: {
+            message,
+            postId,
+            user: {
+              connect: {
+                id: session.user.id,
+              },
+            },
+            image: {
+              connect: {
+                id: session.user.id,
+              },
+            },
+          },
+        });
+
+        return { success: true };
+      } catch (e) {
+        return {
+          error: (e as Error).message,
+        };
+      }
+    },
+  }
+}
+```
+```ts type.ts
+import { PrismaClient } from "@prisma/client";
+import { Session } from "next-auth";
+
+export interface GraphqlContext {
+  session: Session | null;
+  prisma: PrismaClient;
+}
+
+export type Root = any;
+
+/**
+ * * 유저
+ */
+export interface CreateUsernameData {
+  createUsername: {
+    success: boolean;
+    error: string;
+  };
+}
+export interface CreateUsernameInput {
+  username: string;
+}
+export interface CreateUsernameResponse {
+  success?: boolean;
+  error?: string;
+}
+...
+...
+/**
+ * * 코멘트
+ */
+export interface LoadCommentsData {
+  loadComments: LoadComment[];
+}
+export interface LoadCommentsInput {
+  postId: string;
+}
+export interface LoadComment {
+  id: string;
+  nickname: string;
+  message: string;
+  postId: string;
+  profileImage: string;
+  createdAt: string;
+  updatedAt: string;
+  parentId: string | null;
+  secret: boolean;
+  _count: {
+    likes: number;
+  };
+}
+...
+...
+...
+```
+</CH.Code>
+### Prisma 모델링
+그큐엘 세팅이 끝났으면 본격적으로 일할 때다. 프리즈마 셋팅은 다른 포스트에서 했던 것 같으니 생략하고ㅎ  
+근데 궁금한 건데, 일하시는 분들 순서를 두는지, 아니면 손이 가는 대로 하는지 모르겠다. 이게 생각보다 많이 왔다갔다 하고, 또 겹치는 구석도 있어서,, 나는 일단 프리즈마 스키마부터 짜고, 그 후에 그큐엘의 `resolvers` -> `typesDefs` -> `operations & type` 순으로 만들 때 좀 더 흐름을 이해하면서 작업할 수 있다고 느꼈다. 물론 하다보니 삘 가는 대로 하긴 했는데ㅎ 흠흠 
+<Img src='/images/2022/autumm/스샷_프리즈마모델링.webp' />
+<figcaption>schema.prisma</figcaption>
+<br/>
+아무튼 스키마와 `typeDefs`는 거의 같은 작업이다. 그래서 사실 좀 재미는 없었고, 제일 재밌는 부분은 역시 실제 일을 수행하게 되는 `resolvers`였다. `prisma` 메써드는 이 안에서 활용된다. 어떤 기능들이 있는지만 알면 타입스크립트에 의해 자동완성 기능이 지원되기 때문에 크게 어려운 건 없을 것 같았다. 물론 그거랑 "아니 왜 안돼?"는 별개의 문제다...
+<br/>
+<br/>
+`resolvers`의 작성, 그리고 수행된 데이터의 `refetch` 같은 건 다음주에 계속

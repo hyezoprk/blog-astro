@@ -1,0 +1,53 @@
+---
+import Layout from '../components/layout/Layout.astro';
+import CommandPalette from '../components/navigation/CommandPalette';
+import Profile from '../components/home/Profile';
+import HomeClient from '../components/home/HomeClient';
+import { getAllPosts, getPinnedPosts } from '../lib/posts';
+import '../styles/global.css';
+
+const allPosts = await getAllPosts();
+const pinnedPosts = await getPinnedPosts();
+
+// 직렬화를 위해 필요한 필드만 추출
+const allPostsData = allPosts.map(p => ({
+  id: p.id.replace(/\.mdx?$/, '').split('/').pop() ?? p.id,
+  title: p.data.title,
+  date: p.data.date,
+  categories: p.data.categories,
+  tags: p.data.tags,
+  description: p.data.description ?? '',
+  excerpt: p.data.excerpt ?? '',
+  pinned: p.data.pinned ?? false,
+  series: p.data.series ?? '',
+  image: p.data.image ?? '',
+}));
+
+const recentPostsData = pinnedPosts.map(p => ({
+  id: p.id.replace(/\.mdx?$/, '').split('/').pop() ?? p.id,
+  title: p.data.title,
+  date: p.data.date,
+  categories: p.data.categories,
+  tags: p.data.tags,
+  description: p.data.description ?? '',
+}));
+---
+
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body>
+    <CommandPalette client:load>
+      <Layout home siteTitle="혜조로그">
+        <Profile client:load />
+        <HomeClient
+          client:load
+          allPostsData={allPostsData}
+          recentPosts={recentPostsData}
+        />
+      </Layout>
+    </CommandPalette>
+  </body>
+</html>

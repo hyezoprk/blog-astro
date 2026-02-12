@@ -1,0 +1,21 @@
+---
+import Layout from '../components/layout/Layout.astro';
+import CommandPalette from '../components/navigation/CommandPalette';
+import '../styles/global.css';
+---
+
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body>
+    <CommandPalette client:load>
+      <Layout siteTitle="About 〰 혜조로그">
+        <div class="px-6 pt-16">
+          <a href="/" class="text-[var(--color-paleBlue)]">바보</a>
+        </div>
+      </Layout>
+    </CommandPalette>
+  </body>
+</html>

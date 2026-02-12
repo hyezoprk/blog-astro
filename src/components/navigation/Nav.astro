@@ -1,0 +1,83 @@
+---
+import Darkmode from './Darkmode';
+---
+
+<header id="nav-header" class="flex items-center justify-center transition-all opacity-0">
+  <div class="fixed top-px z-10 flex h-12 w-2/3 flex-row items-center justify-center space-x-16 rounded-lg bg-neutral-200/30 saturate-100 backdrop-blur-sm dark:bg-zinc-600/30 md:max-w-sm">
+    <!-- CommandPalette 트리거 버튼 (kbar와 연동은 클라이언트 스크립트로) -->
+    <button
+      id="cmd-palette-btn"
+      aria-label="Command Palette"
+      class="rounded-md p-1 hover:bg-gray-300/30 dark:hover:bg-zinc-800/30"
+    >
+      <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z" />
+      </svg>
+    </button>
+
+    <a
+      href="/"
+      class="mt-1 no-underline"
+      id="nav-home-link"
+    >
+      <img
+        src="/images/default/profile.png"
+        class="rounded-full"
+        height="40"
+        width="40"
+        alt="프로필"
+      />
+    </a>
+    <Darkmode client:load />
+  </div>
+</header>
+
+<script>
+  // 스크롤에 따른 nav 표시
+  let beforeScrollY = 0;
+  let ticking = false;
+
+  function updateNav() {
+    const header = document.getElementById('nav-header');
+    if (!header) return;
+
+    const currentScrollY = window.scrollY;
+    if (currentScrollY > beforeScrollY && currentScrollY > 60) {
+      header.classList.remove('opacity-0');
+      header.classList.add('opacity-100');
+    } else {
+      header.classList.remove('opacity-100');
+      header.classList.add('opacity-0');
+    }
+    beforeScrollY = currentScrollY;
+    ticking = false;
+  }
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      setTimeout(() => {
+        updateNav();
+        ticking = false;
+      }, 300);
+      ticking = true;
+    }
+  });
+
+  // 홈 링크 클릭 시 watchedTab 초기화
+  document.getElementById('nav-home-link')?.addEventListener('click', () => {
+    sessionStorage.setItem('watchedTab', '0');
+  });
+
+  // Command Palette 버튼: kbar의 query.toggle 이벤트 발생
+  // kbar는 Cmd+K를 자동으로 처리하며, 버튼 클릭은 커스텀 이벤트로 전달
+  document.getElementById('cmd-palette-btn')?.addEventListener('click', () => {
+    // kbar는 자체 키보드 이벤트를 사용. dispatchEvent로 Cmd+K 시뮬레이션
+    const event = new KeyboardEvent('keydown', {
+      key: 'k',
+      metaKey: true,
+      ctrlKey: false,
+      bubbles: true,
+    });
+    document.dispatchEvent(event);
+  });
+</script>

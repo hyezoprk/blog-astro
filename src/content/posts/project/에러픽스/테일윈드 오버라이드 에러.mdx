@@ -1,0 +1,29 @@
+---
+title: 테일윈드 오버라이딩 에러
+date: '2023-02-16'
+categories: project
+tags: 에러픽스
+description: 프론트
+---
+<HeadingNavigator />
+
+### 테일윈드 3.2.5+
+`tailwind 3.2.5`부터 클래스네임 덮어쓰기가 금지됐다.  
+기존에는 같은 목의 클래스를(가령 `text-black`을 `text-blue-500`으로) 스테이트에 따라 덮어 썼는데, 어떤 스타일이 우선되는지에 항상성을 보장할 수 없으므로 사실 이건 버그란다.  
+나도, 이슈 발행자도 버그라고 생각했던 게 버그픽스였던 것 (<Lnk text='Tailwind prohibits overriding className' href='https://github.com/tailwindlabs/tailwindcss/issues/10603#issue-1587930104' />)
+<br/>
+그래서 처음엔 굳이? 싶었던 `clsx`나 `tailwind-merge` 등을 당장은 사용해야 한다.  
+이 둘 모두 같은 목의 클래스가 겹치면 베이스로 있던 클래스를 제거시켜준다.  
+사용법은 비슷하다.  
+제공해주는 함수의 앞쪽에 베이스, 뒤쪽에 추가/변동되는 클래스가 온다.  
+
+```tsx example.tsx
+<Abc 
+  className={clsx("rounded-xl", props.className)}
+  // or
+  className={twMerge("rounded-xl", props.className)}
+  {...props}
+/>
+```
+<br/>
+3.2.4 쎄굿빠..

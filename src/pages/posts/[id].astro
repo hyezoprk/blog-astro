@@ -1,0 +1,134 @@
+---
+import { getCollection } from 'astro:content';
+import { parseISO, format } from 'date-fns';
+import Layout from '../../components/layout/Layout.astro';
+import CommandPalette from '../../components/navigation/CommandPalette';
+import HeadingNavigator from '../../components/mdx/HeadingNavigator';
+import Note from '../../components/mdx/Note';
+import H3 from '../../components/mdx/H3';
+import { Img, Lnk, Youtube } from '../../components/mdx/MdxComponents';
+import { CHCode, CHScrollycoding, CHSpotlight, CHSection } from '../../components/mdx/CHComponents';
+import '../../styles/global.css';
+import { getSeriesPosts } from '../../lib/posts';
+
+// HeadingNavigator를 MDX에 주입할 래퍼 (Astro island는 MDX components map에서 직접 사용 불가)
+// MDX 내 <HeadingNavigator /> 는 null 반환 (페이지 하단에 실제 컴포넌트 렌더링)
+const HeadingNavigatorPlaceholder = () => null;
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts');
+  return posts.map(post => ({
+    params: {
+      id: post.id.replace(/\.mdx?$/, '').split('/').pop() ?? post.id,
+    },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await post.render();
+
+const frontmatter = post.data;
+const postId = post.id.replace(/\.mdx?$/, '').split('/').pop() ?? post.id;
+const formattedDate = format(parseISO(frontmatter.date), 'LLLL d, yyyy');
+
+// 시리즈 포스트 가져오기
+const seriesPosts = frontmatter.series
+  ? await getSeriesPosts(frontmatter.series)
+  : [];
+
+const series = seriesPosts.map(p => ({
+  id: p.id.replace(/\.mdx?$/, '').split('/').pop() ?? p.id,
+  title: p.data.title,
+}));
+
+// MDX 컴포넌트 맵 (React Islands)
+const CH = {
+  Code: CHCode,
+  Scrollycoding: CHScrollycoding,
+  Spotlight: CHSpotlight,
+  Section: CHSection,
+};
+
+const components = {
+  h3: H3,
+  Note,
+  Img,
+  Lnk,
+  Youtube,
+  CH,
+  HeadingNavigator: HeadingNavigatorPlaceholder,
+};
+---
+
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body>
+    <CommandPalette client:load>
+      <Layout
+        siteTitle={`${frontmatter.title} 〰 혜조로그`}
+        category={frontmatter.categories}
+      >
+        <div class="duration-1000 opacity-0" id="post-content">
+          <h1 class="overflow-hidden text-ellipsis text-center sm:mt-20 sm:px-3 md:mt-28">
+            {frontmatter.title}
+          </h1>
+          <div class="flex justify-center leading-6 sm:mb-10 sm:mt-3 md:mb-12 md:mt-5">
+            <time datetime={frontmatter.date}>{formattedDate}</time>
+          </div>
+
+          {series.length > 0 && (
+            <div class="flex rounded-lg border p-5 text-base leading-6 sm:mx-20 sm:mb-10 md:mx-24 md:mb-12">
+              <div class="flex flex-col">
+                <h5 class="font-heading text-base font-bold">시리즈</h5>
+                <ul class="flex list-decimal flex-col">
+                  {series.map(each => (
+                    <li
+                      class={postId !== each.id
+                        ? 'marker:text-current'
+                        : 'text-emerald-600 marker:text-emerald-600'}
+                    >
+                      <a class="no-underline" href={`/posts/${each.id}`}>
+                        {postId === each.id ? (
+                          <Note client:load type="highlight" color="#CAFC9D" show={true}>
+                            {each.title}
+                          </Note>
+                        ) : (
+                          each.title
+                        )}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          <article
+            class={`keep-all mx-6 my-10 ${
+              frontmatter.categories === 'reading'
+                ? 'word-arita font-content text-sm2 leading-6 tracking-tight'
+                : 'font-line text-base antialiased sm:leading-6 md:leading-7'
+            }`}
+          >
+            <Content components={components} />
+          </article>
+        </div>
+
+        <HeadingNavigator client:load />
+      </Layout>
+    </CommandPalette>
+
+    <script>
+      // 페이드인 애니메이션
+      const el = document.getElementById('post-content');
+      if (el) {
+        el.classList.remove('opacity-0');
+        el.classList.add('opacity-100');
+      }
+    </script>
+  </body>
+</html>

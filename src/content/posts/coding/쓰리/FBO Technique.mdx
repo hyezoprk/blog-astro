@@ -1,0 +1,183 @@
+---
+title: '[Three-2D] FBO Technique'
+date: "2023-09-05"
+categories: "coding"
+tags: "쓰리제이에스"
+description: "Intro"
+---
+
+<HeadingNavigator />
+
+### 무슨 뜻이죠
+이유 없는 준말은 없겠지만 처음에 이 용어를 듣곤 멍때렸다. 응? FBO라고? FBI UFO 이딴 것만 생각났지 아무 감도 안 왔다. 알고 보면 의미가 고스란히 드러나는 단어인데 말이다.
+<br/>
+`FBO`는 `Frame Buffer Object`[^1]의 약자다. 아니, 난 풀어봐도 모르겠는데? 하는 사람이 나였지만 버퍼링의 뜻을 떠올리면 어려운 것만도 아니다. 추측하면 프레임의 속도(연산) 차를 조정하기 위해 고안된 어떤 객체일 것만 같은데, 정말 그럴까? 맞다 👀  
+정확히 말하면 `FBO`란 계산과 렌더를 분리하는 테크닉이다. 렌더링에 들어가는 복잡한 연산을 셋팅이 최소화된 환경에서 먼저 돌린 뒤, 그 값을 본 렌더링에 넘겨주는 기법을 의미한다. 화면에 보이지 않는 곳에서 값싸게 연산을 처리하는 그림자 렌더링인 것. 근데 왜 이 장치가 필요할까?
+<br/>
+당연히 속도 때문이다. `three.js`의 텍스쳐 렌더링은 일반적인 UI 작업에 비해 복잡도가 크다. 포지션을 잡기 위해 버퍼 데이터(매트릭스)를 채우는 것도 그런데, 그 4바이트 픽셀(XYZA) 하나하나에 매프레임 `shader`의 벡터 연산이 들어가야 한다. 그깟 연산, 이라고 생각할 수 있지만 사이즈를 256으로 잡아도 대략 6만 번의 연산이 돌아가니 보통 일은 아니다. 사이즈가 커질수록 GPU도 과부하에 걸리기 십상이다.
+<br/>
+그래서 FBO 테크닉이 등장했다. 그럼 최소환의 환경이란 뭘까? 먼저 생각할 수 있는 건 카메라다. 값싼 환경에서 연산을 돌리겠다는 말은 사람들에게 노출되지 않는 곳에서 단지 그 연산값만을 챙기겠다는 의도다. 여기서 `perspective` 카메라는 사치일 것이다. 그래서 FBO 환경에서는 일반적으로 원근법이 없는 `orthographic` 카메라를 셋팅한다.
+<br/>
+(물론 대부분의 openGL 라이브러리가 FBO 테크닉을 내재하고 있다고 한다. 자기가 직접 만드는 일은 드물겠지만, 이 과정의 목적은 기본기이기 때문에 원리를 이해하고 직접 구현하는 과정을 거친다.)
+<br/>
+---
+### setupFBO
+전체 코드를 본다.  
+세세하게 말하면 한없이 길어지니 주석으로 대체하고, 중요한 포인트만 뒤에서 후술한다.
+
+```js sketch.js
+...
+setupFBO(){
+  this.size = 32;
+  this.number = this.size * this.size;
+
+  // 데이터 텍스쳐를 본 렌더링이 아닌 FBO에서 만든다.
+  const data = new Float32Array(4 * this.number);
+    for (let i = 0; i < this.size; i++) {
+      for (let j = 0; j < this.size; j++) {
+        const index = i * this.size + j;
+        data[4 * index] = lerp(-0.5, 0.5, j / (this.size - 1));
+        data[4 * index + 1] = lerp(-0.5, 0.5, i / (this.size - 1));
+        data[4 * index + 2] = 0;
+        data[4 * index + 3] = 1;
+      }
+    }
+
+  this.positions = new THREE.DataTexture(
+      data,
+      this.size,
+      this.size,
+      THREE.RGBAFormat,
+      THREE.FloatType,
+    );
+  this.positions.needsUpdate = true;
+  
+  this.sceneFBO = new THREE.Scene(); // 새로운 씬
+  this.cameraFBO = new THREE.OrthographicCamera(-1, 1, 1, -1, 2, -2); // x: -1 ~ 1, y: 1 ~ -1, z: 2(near) ~ -2(far);  중앙점을 정면에서 촬영
+  this.cameraFBO.position.z = 1;
+  this.cameraFBO.lookAt(new THREE.Vector3(0));
+  
+  let geo = new THREE.PlaneGeometry(2, 2);
+  // FBO 셰이더들은 simulator의 의미를 띄도록 작명
+  this.simMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff0000,
+    wifeFrame: true,
+  });
+  this.simMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uTexture: { value: this.positions },
+    },
+    vertexShader: simVertextShader,
+    fragmentShader: simFragmentShader,
+  });
+  this.simMesh = new THREE.Mesh(geo, this.simMaterial);
+  this.sceneFBO.add(this.simMesh);
+  
+  // 매우 경량화된 렌더링(minified version)
+  this.renderTarget = new THREE.WebGLRenderTarget(this.size, this.size, {
+    minFilter: THREE.NearestFilter,
+    magFilter: THREE.NearestFilter,
+    format: THREE.RGBAFormat,
+    type: THREE.FloatType,
+  })
+
+  // 데이터 보존 핑퐁용(for consistence animation)
+  this.renderTargetTwo = new THREE.WebGLRenderTarget(this.size, this.size, {
+    minFilter: THREE.NearestFilter,
+    magFilter: THREE.NearestFilter,
+    format: THREE.RGBAFormat,
+    type: THREE.FloatType,
+  })
+}
+...
+
+render(){
+	...  
+  // 퍼포먼스에 무리 주지 않는 렌더 환경(=FBO)에서 데이터 텍스쳐 생성 (단순화된 카메라 -> 낭비 줄임)
+  this.renderer.setRenderTarget(this.renderTarget);
+  this.renderer.render(this.sceneFBO, this.cameraFBO);
+  
+  // 널값으로 돌려 disconnect 한 뒤, 본 렌더 스냅샷 출력
+  this.renderer.setREnderTarget(null); // 기본 버퍼 스크린으로 돌아간다.
+  this.renderer.render(this.scene, this.camera);
+  
+  // 셰이더에서 데이터를 이어나가기 위한 핑퐁
+  const tmp = this.renderTarget;
+  this.renderTarget = this.renderTargetTwo;
+  this.renderTargetTwo = tmp;
+  
+  // 값싸게 생성한 데이터 텍스쳐는 uniform으로 전달 (uTexture는 후에 uCurrentPostion으로 이름 변경)
+  this.material.uniforms.uTexture.value = this.renderTarget.texture;
+  this.simMaterial.uniforms.uTexture.value = this.renderTargetTwo.texture;
+  
+  requestAnimationFrame(this.render.bind(this));
+}
+```
+
+### 가상의 렌더 타겟 설정
+긴 코드에서 핵심이 되는 곳이 여기다. `WebGLRenderTarget`은 `Three`에서 FBO 구축을 위해 제공하는 인스턴스다. 이는 화면에 보이지 않고 각종 작업을 수행하는, 말하자면 비밀 레이어다. 다음과 같이 크기와 포맷, 타입 등이 최소화된 렌더타겟을 설정한다.
+```js sketch.js
+  this.renderTarget = new THREE.WebGLRenderTarget(this.size, this.size, {
+    minFilter: THREE.NearestFilter,
+    magFilter: THREE.NearestFilter,
+    format: THREE.RGBAFormat,
+    type: THREE.FloatType,
+  })
+```
+<br/>
+그다음의 절차는 다음과 같다.
+1. 렌더러에 `setRenderTarget`를 사용하여 렌더 타겟을 설정한다. 
+2. 렌더러에 `render`를 호출하여 FBO 씬을 렌더링한다. 그럼 값이 업데이트 되고,
+3. `setRenderTarget`을 null로 두어 기본값으로 되돌린다.
+4. 본 렌더링을 호출한다.
+
+```js sketch.js
+render(){
+	...  
+  // 퍼포먼스에 무리 주지 않는 렌더환경에서 데이터 텍스쳐 생성 (단순화된 카메라 -> 낭비 줄임)
+  this.renderer.setRenderTarget(this.renderTarget);
+  this.renderer.render(this.sceneFBO, this.cameraFBO);
+  
+  // 널값으로 돌려 disconnect 한 뒤, 본 렌더 스냅샷 출력
+  this.renderer.setRenderTarget(null); // 기본 버퍼 스크린으로 되돌린다.
+  this.renderer.render(this.scene, this.camera);
+}
+```
+이러면 FBO 씬이 실행되고 그 결과가 `this.renderTarget`에 남는다. 이제 남은 건 `uniforms`에 그 값을 전달하여 셰이더 연산에 사용하는 것이다.
+
+
+### 렌더 타겟과 서브 렌더 타겟
+우선 업데이트 된 값을 갱신, 교환하자. 이를 위해 `tmp`라는 임시 변수통을 만들고 교환을 진행한다.
+1. 업데이트된 값을 먼저 `tmp`에 백업한다.
+2. 백업을 마쳤으면 본값에는 초기값(이전값)을 저장한다.  (0, 1, 2...)
+3. 업데이트된 값은 초기값(이전값)에 덮어 쓴다.  (1, 2, 3...)
+4. 각각의 `uniform`의 값을 업데이트한다.
+5. 반복
+```js sketch.js
+  ...
+  // 셰이더에서 데이터를 이어나가기 위한 핑퐁
+  const tmp = this.renderTarget;
+  this.renderTarget = this.renderTargetTwo;
+  this.renderTargetTwo = tmp;
+  
+  // 값싸게 생성한 데이터 텍스쳐는 uniform으로 전달 (uTexture는 후에 uCurrentPostion으로 이름 변경)
+  this.material.uniforms.uTexture.value = this.renderTarget.texture;
+  this.simMaterial.uniforms.uTexture.value = this.renderTargetTwo.texture;
+  
+  requestAnimationFrame(this.render.bind(this));
+```
+
+### 정리
+셰이더에서 GPU를 사용한 연산은 그 자체 캐싱된 결과값을 저장하지 못한다. 각 픽셀에 대해 똑같은 연산을 반복할 뿐. 매번 첫단추만 끼우는 지루한 퍼즐놀이가 시작된다.
+<br/>
+그래서 연산된 결과값을 이관하여 보존하는 작업이 필요하다. 이 목적에 부합하는 `Three`의 인스턴스가 `WebGLRenderTarget`이다. `WebGLRenderTarget`으로 사용자에게 화면을 노출시키지 않으면서 이전 렌더의 업데이트 값을 자바스크립트로 가져올 수 있다. 보여지는 렌더링이 아니기 때문에 최소화된 환경을 가지게 셋팅한다. 연산을 처리한 뒤 이를 각각의 `uniforms`에 반영한다. 애니메이션이 진행된다.  
+<br/>
+이 모든 과정을 `FBO`라 부른다. 그러니까 한마디로 정리하면 애니메이션에 GPU 연산을 효율적으로 사용하기 위해 고안된 기술이 `FBO`인 것이다.
+<br/>
+다음 포스트에서는 `simVertex`, `simMaterial`에서 처리되는 벡터 연산을 살펴보도록 하자!
+<br/>
+---
+<br/>
+#### 참고한 문서
+[^1]: <Lnk text='OpenGL 위키' href='https://www.khronos.org/opengl/wiki/Framebuffer' />

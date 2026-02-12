@@ -1,0 +1,655 @@
+@import "tailwindcss";
+
+/* ===================================
+   Tailwind CSS 4 Custom Theme
+   =================================== */
+@theme {
+  /* Custom Colors */
+  --color-waterMelon: #ed4c6a;
+  --color-orange: #ffa500;
+  --color-favBlue: #0000b9;
+  --color-sea: #d8f4f9;
+  --color-icloud: #3d84f7;
+  --color-paleBlue: rgb(102, 153, 204);
+  --color-lightGray: #edf1f2;
+  --color-darkGray: #333333;
+  --color-smokeWhite: #f6fafa;
+  --color-smokeBlack: #1e1e1e;
+  --color-salary: #cafc9d;
+  --color-jadu: #d73a4a;
+  --color-darkslateblue: darkslateblue;
+  --color-paleYellow: #f7e596;
+
+  /* Responsive Breakpoints */
+  --breakpoint-sm: 375px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1200px;
+  --breakpoint-xl: 1440px;
+
+  /* Fluid Font Sizes */
+  --text-sm: clamp(0.67rem, calc(0.59rem + 0.22vw), 0.76rem);
+  --text-sm2: clamp(0.81rem, calc(0.68rem + 0.31vw), 0.88rem);
+  --text-mono: clamp(0.78rem, calc(0.67rem + 0.31vw), 0.92rem);
+  --text-base: clamp(0.81rem, calc(0.69rem + 0.33vw), 0.97rem);
+  --text-base2: clamp(0.85rem, calc(0.74rem + 0.44vw), 1.05rem);
+  --text-md: clamp(0.9rem, calc(0.82rem + 0.55vw), 1.22rem);
+  --text-md2: clamp(0.94rem, calc(0.83rem + 0.6vw), 1.32rem);
+  --text-lg: clamp(1.17rem, calc(0.95rem + 0.88vw), 1.76rem);
+  --text-xl: clamp(1.40rem, calc(1.09rem + 1.08vw), 1.95rem);
+  --text-2xl: clamp(1.69rem, calc(1.25rem + 1.48vw), 2.44rem);
+  --text-3xl: clamp(1.9rem, calc(1.44rem + 1.67vw), 2.84rem);
+
+  /* Custom Font Families */
+  --font-sans: ui-sans-serif, system-ui;
+  --font-serif: ui-serif, Georgia;
+  --font-mono: Agave, ui-monospace, SFMono-Regular;
+  --font-heading: LeferiPointSpecial;
+  --font-content: NunitoSans, Arita;
+  --font-line: NunitoSans, Pretendard;
+  --font-grapeNuts: GrapeNuts;
+
+  /* Custom Cursors */
+  --cursor-fancy: url('/images/2022/autumm/cursor.png'), default;
+  --cursor-fancyHover: url('/images/2022/autumm/cursor_hover.png'), pointer;
+
+  /* Custom Scroll Padding */
+  --scroll-padding-vmax: 14vmax;
+
+  /* Background Images */
+  --bg-image-blob: url('/images/2022/blob/blob1.svg');
+  --bg-image-close: url('/images/2022/blob/close.png');
+
+  /* Custom Animations */
+  --animate-wiggle: wiggle 1s ease-in-out infinite;
+  --animate-swap: swap 0.8s ease-in-out;
+  --animate-swapReverse: swapReverse 0.8s ease-in-out;
+
+  /* Min Height */
+  --min-height-content: 100vh;
+
+  /* Transition Duration */
+  --transition-duration-3000: 3000ms;
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+@keyframes swap {
+  50% { transform: translateY(50px); }
+  100% { transform: translateY(-250px); opacity: 0; }
+}
+@keyframes swapReverse {
+  0% { transform: translateY(150px); opacity: 0; }
+  100% { transform: translateY(0px); opacity: 1; }
+}
+
+/* ===================================
+   Font Face Declarations
+   =================================== */
+@font-face {
+  font-family: "Arita";
+  src: url("/fonts/Arita.woff2") format("woff2");
+  font-weight: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Pretendard";
+  src: url("/fonts/Pretendard-Regular.woff2") format("woff2");
+  font-weight: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "LeferiPointSpecial";
+  src: url("/fonts/LeferiPointSpecial.woff2") format("woff2");
+  font-weight: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "NunitoSans";
+  src: url("/fonts/NunitoSans-Regular.woff2") format("woff2");
+  font-weight: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Agave";
+  src: url("/fonts/Agave.woff2") format("woff2");
+  font-weight: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "GrapeNuts";
+  src: url("/fonts/GrapeNuts-Regular.woff2") format("woff2");
+  font-weight: normal;
+  font-display: block;
+}
+
+/* ===================================
+   Base Styles
+   =================================== */
+@layer base {
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
+  html, body {
+    height: 100%;
+    cursor: var(--cursor-fancy);
+    scroll-padding: 2rem;
+    scroll-padding-top: 14vmax;
+    scroll-behavior: smooth;
+    font-family: var(--font-content);
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+
+  ::selection {
+    background-color: var(--color-sea);
+  }
+
+  .dark ::selection {
+    color: black;
+  }
+
+  a {
+    cursor: var(--cursor-fancyHover);
+    text-decoration: underline;
+    text-decoration-color: var(--color-paleBlue);
+    text-decoration-style: solid;
+    text-underline-offset: 8px;
+  }
+  a:hover {
+    text-decoration-style: wavy;
+  }
+
+  h1 {
+    font-family: var(--font-heading);
+    font-size: var(--text-3xl);
+  }
+  h2 {
+    margin-bottom: 1.25rem;
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+  }
+  h3 {
+    position: relative;
+    font-family: var(--font-heading);
+    font-size: var(--text-lg);
+    font-weight: bold;
+    margin-top: 3rem;
+    margin-bottom: 1px;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+  @media (min-width: 768px) {
+    h3 {
+      margin-top: 5rem;
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+  }
+  h4 {
+    padding-top: 2.5rem;
+    padding-bottom: 0.5rem;
+    font-family: var(--font-heading);
+    font-size: var(--text-md2);
+    font-weight: bold;
+    color: rgb(5, 150, 105);
+  }
+  h5 {
+    font-size: var(--text-base);
+  }
+
+  p:not(blockquote p, ul p) {
+    padding-top: 0.5rem;
+  }
+  blockquote p {
+    line-height: 1.25rem;
+  }
+  @media (min-width: 768px) {
+    blockquote p { line-height: 1.5rem; }
+  }
+
+  blockquote label {
+    margin-bottom: 0.75rem;
+    display: inline-block;
+    border-radius: 1rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    font-size: var(--text-sm);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: white;
+    line-height: 1.5rem;
+  }
+  blockquote label.green {
+    background-color: rgb(5, 150, 105);
+  }
+  blockquote label.green::before { content: 'information'; }
+  blockquote label.red {
+    background-color: rgb(239, 68, 68);
+  }
+  blockquote label.red::before { content: 'important'; }
+  blockquote label.orange {
+    background-color: var(--color-orange);
+  }
+  blockquote label.orange::before { content: 'tldr'; }
+
+  blockquote {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.375rem;
+    background-color: var(--color-smokeWhite);
+    font-size: var(--text-mono);
+    padding: 1rem;
+    line-height: 1.5rem;
+  }
+  .dark blockquote {
+    background-color: var(--color-smokeBlack);
+  }
+  @media (min-width: 768px) {
+    blockquote {
+      padding: 1.25rem;
+      line-height: 1.75rem;
+    }
+  }
+
+  p > br {
+    display: block;
+    border-bottom: 0.7rem solid transparent;
+    content: '';
+  }
+
+  ul {
+    list-style-type: disc;
+    padding-left: 1rem;
+    line-height: 1.25rem;
+  }
+  @media (min-width: 768px) {
+    ul { padding-left: 1.5rem; line-height: 1.75rem; }
+  }
+
+  ol {
+    list-style-type: decimal;
+    padding-top: 1rem;
+    padding-left: 1rem;
+  }
+
+  ul > li::marker {
+    color: var(--color-paleBlue);
+  }
+
+  ul ul {
+    list-style-type: circle;
+    font-size: var(--text-base);
+    padding-left: 0.5rem;
+    line-height: 1.25rem;
+  }
+  @media (min-width: 768px) {
+    ul ul { padding-left: 0.75rem; padding-bottom: 0.75rem; line-height: 1.5rem; }
+  }
+
+  ul ul ul li {
+    list-style-type: square;
+    padding-bottom: 1px;
+    padding-left: 0.25rem;
+    font-size: var(--text-base);
+    line-height: 1.25rem;
+  }
+
+  button {
+    cursor: var(--cursor-fancyHover);
+  }
+  button:disabled {
+    cursor: var(--cursor-fancy);
+  }
+
+  p code, li code {
+    margin-left: 1px;
+    margin-right: 1px;
+    border-radius: 0.375rem;
+    background-color: var(--color-lightGray);
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    padding-top: 1px;
+    padding-bottom: 1px;
+    vertical-align: top;
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+  }
+
+  b {
+    margin-left: 1px;
+    margin-right: 1px;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    background-color: #22d3ee1a;
+    background-image: linear-gradient(
+      135deg,
+      #06b6d480 10%,
+      transparent 0,
+      transparent 50%,
+      #06b6d480 0,
+      #06b6d480 60%,
+      transparent 0,
+      transparent
+    );
+    background-size: 7.07px 7.07px;
+  }
+
+  q {
+    background-image: linear-gradient(transparent calc(50% - 8px), #f7e596 calc(50% - 8px));
+    background-size: 100% 220%;
+  }
+  .dark q {
+    background-image: linear-gradient(transparent calc(50% - 9px), darkslateblue calc(50% - 9px));
+    background-size: 100% 220%;
+  }
+
+  cite {
+    display: flex;
+    justify-content: flex-end;
+    font-style: normal;
+  }
+  cite::before {
+    margin-right: 0.25rem;
+    content: '-';
+  }
+
+  figcaption {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-mono);
+  }
+
+  sup > a {
+    margin-left: 1px;
+    margin-right: 1px;
+    color: var(--color-jadu);
+    text-decoration: none;
+  }
+  sup > a:hover { font-weight: bold; }
+
+  small {
+    display: flex;
+    justify-content: flex-start;
+    padding-left: 1px;
+    font-size: var(--text-mono);
+    text-transform: capitalize;
+    margin-top: -0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  small::before {
+    margin-right: 0.25rem;
+    content: '-';
+  }
+  @media (min-width: 768px) {
+    small { margin-top: -1rem; margin-bottom: 1rem; }
+  }
+
+  hr {
+    margin-top: 2.5rem;
+    margin-bottom: 2.5rem;
+  }
+  @media (min-width: 375px) {
+    hr { margin-top: 1.5rem; margin-bottom: 1.5rem; }
+  }
+
+  details {
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+  }
+  details[open] {
+    background-color: white;
+    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1);
+    ring: 1px solid rgba(0,0,0,0.05);
+  }
+  .dark details[open] {
+    background-color: rgb(15, 23, 42);
+  }
+
+  #footnote-label,
+  .data-footnote-backref {
+    display: none;
+  }
+}
+
+/* ===================================
+   Components
+   =================================== */
+@layer components {
+  .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn {
+    display: flex;
+    height: 1.5rem;
+    width: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    border-top: 1px solid rgb(229, 231, 235);
+  }
+
+  .avartar {
+    display: inline-block;
+    height: 3rem;
+    width: 3rem;
+    border-radius: 9999px;
+    box-shadow: 0 0 0 2px white;
+  }
+
+  .anchor-link {
+    position: absolute;
+    transform: translateX(-2.5rem);
+    opacity: 0;
+    transition-duration: 150ms;
+  }
+  h3:hover .anchor-link {
+    opacity: 1;
+  }
+}
+
+/* ===================================
+   Utilities
+   =================================== */
+@layer utilities {
+  .keep-all {
+    word-break: keep-all;
+  }
+
+  .align-text-20 {
+    vertical-align: -20%;
+  }
+
+  .align-text-17 {
+    vertical-align: -17%;
+  }
+
+  .writing-vertical {
+    writing-mode: vertical-lr;
+    text-orientation: upright;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .word-arita {
+    word-spacing: 0.1em;
+  }
+
+  .word-safari {
+    word-spacing: 0.4em;
+  }
+
+  .word-tightest {
+    word-spacing: -0.85em;
+  }
+
+  .blue-dot {
+    width: 8px;
+    min-width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 2px solid rgb(102, 153, 204);
+    background-color: rgb(102, 153, 204);
+    margin: 8px;
+  }
+
+  .white-dot {
+    width: 8px;
+    min-width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid;
+    margin: 8px;
+  }
+
+  /* Striped Backgrounds */
+  .bg-stripes-gray {
+    background-color: #9ca3af1a;
+    background-image: linear-gradient(135deg, #6b728080 10%, transparent 0, transparent 50%, #6b728080 0, #6b728080 60%, transparent 0, transparent);
+    background-size: 7.07px 7.07px;
+  }
+  .bg-stripes-cyan {
+    background-color: #22d3ee1a;
+    background-image: linear-gradient(135deg, #06b6d480 10%, transparent 0, transparent 50%, #06b6d480 0, #06b6d480 60%, transparent 0, transparent);
+    background-size: 7.07px 7.07px;
+  }
+  .bg-stripes-sky {
+    background-color: #38bdf81a;
+    background-image: linear-gradient(135deg, #0ea5e980 10%, transparent 0, transparent 50%, #0ea5e980 0, #0ea5e980 60%, transparent 0, transparent);
+    background-size: 7.07px 7.07px;
+  }
+  .bg-stripes-blue {
+    background-color: #60a5fa1a;
+    background-image: linear-gradient(135deg, #3b82f680 10%, transparent 0, transparent 50%, #3b82f680 0, #3b82f680 60%, transparent 0, transparent);
+    background-size: 7.07px 7.07px;
+  }
+  .bg-stripes-indigo {
+    background-color: #818cf81a;
+    background-image: linear-gradient(135deg, #6366f180 10%, transparent 0, transparent 50%, #6366f180 0, #6366f180 60%, transparent 0, transparent);
+    background-size: 7.07px 7.07px;
+  }
+  .bg-stripes-violet {
+    background-color: #a78bfa1a;
+    background-image: linear-gradient(135deg, #8b5cf680 10%, transparent 0, transparent 50%, #8b5cf680 0, #8b5cf680 60%, transparent 0, transparent);
+    background-size: 7.07px 7.07px;
+  }
+  .bg-stripes-purple {
+    background-color: #c084fc1a;
+    background-image: linear-gradient(135deg, #a855f780 10%, transparent 0, transparent 50%, #a855f780 0, #a855f780 60%, transparent 0, transparent);
+    background-size: 7.07px 7.07px;
+  }
+  .bg-stripes-fuchsia {
+    background-color: #e879f91a;
+    background-image: linear-gradient(135deg, #d946ef80 10%, transparent 0, transparent 50%, #d946ef80 0, #d946ef80 60%, transparent 0, transparent);
+    background-size: 7.07px 7.07px;
+  }
+  .bg-stripes-pink {
+    background-color: #f472b61a;
+    background-image: linear-gradient(135deg, #ec489980 10%, transparent 0, transparent 50%, #ec489980 0, #ec489980 60%, transparent 0, transparent);
+    background-size: 7.07px 7.07px;
+  }
+  .bg-stripes-white {
+    background-image: linear-gradient(135deg, hsla(0,0%,100%,0.75) 10%, transparent 0, transparent 50%, hsla(0,0%,100%,0.75) 0, hsla(0,0%,100%,0.75) 60%, transparent 0, transparent);
+    background-size: 7.07px 7.07px;
+  }
+
+  /* Highlight Backgrounds */
+  .bg-highlight-paleYellow {
+    background-image: linear-gradient(transparent calc(50% - 8px), #f7e596 calc(50% - 8px));
+    background-size: 100% 220%;
+  }
+  .bg-highlight-bora {
+    background-image: linear-gradient(transparent calc(50% - 9px), darkslateblue calc(50% - 9px));
+    background-size: 100% 220%;
+  }
+}
+
+/* ===================================
+   Notepad TOC styles (HeadingNavigator)
+   =================================== */
+.notepad,
+.notepad::before,
+.notepad::after {
+  background-color: white;
+  background-image:
+    linear-gradient(#f6abca 1px, transparent 1px),
+    linear-gradient(#f6abca 1px, transparent 1px),
+    linear-gradient(#e8e8e8 1px, transparent 1px);
+  background-size: 1px 1px, 1px 1px, 23px 23px;
+  background-repeat: repeat-y, repeat-y, repeat;
+  background-position: 22px 0, 24px 0, 0 50px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15), 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+.notepad {
+  position: relative;
+  padding: 5px 23px 14px 35px;
+  margin-right: 10px;
+  width: 100%;
+  color: #666;
+  font-size: 11px;
+  line-height: 2.09;
+  opacity: 1;
+}
+
+.notepad a {
+  text-decoration: none;
+}
+
+.notepad::before,
+.notepad::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 100%;
+  left: 3px;
+  right: 3px;
+  margin-top: -2px;
+  height: 4px;
+  background-size: 1px 1px, 1px 1px, 0 0;
+}
+
+.notepad::before {
+  z-index: -2;
+  left: 6px;
+  right: 6px;
+  height: 6px;
+  background-color: #eee;
+}
+
+.notepad_heading {
+  position: relative;
+  z-index: 10;
+  height: 23px;
+  border-radius: 2px 2px 0 0;
+  background-image: linear-gradient(to bottom, #3a3a3a, #31363a);
+  box-shadow: inset 0 1px #000, 0 2px 1px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 1px black;
+}
+
+.notepad_heading::before,
+.notepad_heading::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 1px;
+  right: 1px;
+  height: 0;
+  border-top: 1px dashed #617c90;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.notepad_heading::after {
+  bottom: 3px;
+  border-color: rgba(0, 0, 0, 0.5);
+}

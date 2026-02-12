@@ -1,0 +1,88 @@
+---
+title: Redis Docker 설치
+date: "2024-10-28"
+categories: project
+tags: 어푸
+description: 백엔드
+---
+<HeadingNavigator />
+
+### Redis 도입 배경
+회원가입시 메일을 통해 3분 짜리 인증코드를 전송하고 있다.
+3분이 지나면 클라이언트에서 버튼이 비활성화되지만, 어쨌든 서버에서도 이 코드를 만료(삭제)시켜야 한다. 시간이 지난 코드를 재사용하는 사태가 일어나선 안 되기 때문이다.
+
+### Redis의 장점
+1. 키-밸류 기반의 데이터베이스이며 가볍고 리소스가 적게 든다[^1].
+2. 일반적인 데이터베이스는 디스크에 저장되지만 redis는 서버의 메모리에 저장되어 빠르다[^1].
+3. TTL(Time To Live) 설정으로 데이터를 자동 만료처리 할 수 있다.
+4. 비단 인증코드만이 아니라 추후 다른 기능에서 쓰일 수 있을 것 같았다. 초대 기능이나 쿠폰 기능도 염두에 두고 있는 데 추후 요긴하게 쓰일 것이다.
+5. Nestjs에서는 캐시모듈을 제공하고 `redisStore`를 연동하도록 도와준다
+
+### Redis 컨터이너 설치
+먼저 이미지를 다운받는다.
+```sh
+docker pull redis
+```
+
+다운받은 이미지를 사용해서 컨테이너를 구성했다. 각 명령을 간략히 풀어보면
+```sh
+docker run -d \
+  --name redis \
+  --network server \
+  -p 6379:6379 \
+  -v redis-settings:/data \
+  redis redis-server etc/redis/redis.conf
+```
+
+- name: 컨테이너 이름으로 사용된다
+- network: 해당 네트워크로 컨테이너를 격리시킨다
+- p: 포트를 배정한다
+- v: 볼륨을 연동한다. 콜론을 기준으로 왼쪽이 내 인스턴스에 저장되는 볼륨명이고, 오른쪽이 redis 컨테이너 내부의 폴더를 가리킨다.
+- redis: 다운받은 redis 이미지로 실행한다. 이어지는 `redis-server`는 레디스 명령어로, 컨테이너 실행시 바로 수행된다. 즉 레디스 서버가 메모리 제한, 지속성 옵션, 보안 설정 등이 담긴 `redis.conf` 파일을 사용하도록 지시하는 것.
+
+
+### Nestjs에 연동
+공식문서에서는 `cache-manager-redis-store`를 설치하는데 자꾸 타입에러가 떴다. 다음 이슈[^2]에서 정보를 얻어 다른 패키지를 설치했다.
+```ts app.module.ts
+import { CacheModule, Module } from '@nestjs/common';
+import { redisStore } from 'cache-manager-redis-yet';
+
+CacheModule.registerAsync<RegistrationOptions>({
+  isGlobal: true,
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: async (configService: ConfigService) => ({
+    store: await redisStore({
+      ttl: 180000,
+      socket: {
+        host: configService.get<string>(ENV.REDIS_HOST_KEY),
+        port: parseInt(configService.get<string>(ENV.REDIS_PORT_KEY)),
+      },
+      password: configService.get<string>(ENV.REDIS_PASS_KEY),
+    }),
+  }),
+}),
+```
+주의할 건 캐시 매니저 버전이 4일 땐 ttl이 초단위이고, 5버전에서는 밀리세컨드 단위라는 것. 별도로 다운그레이드를 하지 않는다면 최신 버전인 5를 사용하므로 밀리세컨드 단위로 시간을 설정한다.
+
+> <label className="green" />
+> 이 ttl은 디폴트 셋팅이다. redis 캐시 기능을 사용하는 곳마다 별도로 지정해줄 수 있다.
+
+- host: redis 컨테이너가 탑재된 도메인 주소(ec2의 퍼블릭 IP, 혹은 네임서버)
+- port: redis 컨테이너에 할당한 포트 번호
+- password: redis.conf에 설정한 `requirepass` 값
+
+<Img src='/images/2024/send_mail.png' />
+이메일 주소 입력 후 요청을 하면 타이머가 가동된다. 이때 redis 서버에서 발급된 키를 조회해보면
+
+<Img src='/images/2024/redis.png' />
+해당 이메일이 키값으로 들어와있고, 그 값인 인증코드는 메일로 보내진 걸 확인할 수 있다.
+
+
+<br/>
+<br/>
+---
+#### 참고문서
+[^1]: <Lnk text='레디스 알고 쓰자' href='https://velog.io/@banggeunho/%EB%A0%88%EB%94%94%EC%8A%A4Redis-%EC%95%8C%EA%B3%A0-%EC%93%B0%EC%9E%90.-%EC%A0%95%EC%9D%98-%EC%A0%80%EC%9E%A5%EB%B0%A9%EC%8B%9D-%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98-%EC%9E%90%EB%A3%8C%EA%B5%AC%EC%A1%B0-%EC%9C%A0%ED%9A%A8-%EA%B8%B0%EA%B0%84' />
+[^2]: <Lnk text='Upgrade redis to v4' href='https://github.com/dabroek/node-cache-manager-redis-store/issues/40#issuecomment-1383193211' />
+

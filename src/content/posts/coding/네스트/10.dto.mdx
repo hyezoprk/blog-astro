@@ -1,0 +1,210 @@
+---
+title: DTO
+date: "2023-11-24"
+categories: coding
+tags: "네스트"
+description: "10"
+---
+
+<HeadingNavigator />
+
+### 클래스 밸리데이터
+<small>class validator</small>
+
+클래스 밸리데이터는 객체를 검증하는 툴이다. 같은 개발자의 `class-transformer`와 한쌍을 이루며 객체를 검증하고 변환하는 역할을 수행한다.  
+
+사용에 있어 데코레이터를 쓰기에 NestJS와 한몸을 이루듯 맞아떨어지는 것이 장점인 것 같다. 이 점 때문에 `zod`보다 나은 선택처럼 느껴지는데, 물론 `zod`를 이용하는 방식 역시 공식 문서에서 소개되고 있다[^1].
+
+### DTO
+<small>Data Transfer Object</small>
+
+직역하면 데이터 전송 객체다. 풀어서 얘기하면 클라이언트에서 보낸 데이터를 내가 정한 모양으로 가공하는 객체라고 하겠다. 개발자인 내가 가진 주형틀로서, 일종의 인터페이스이지만, 추상적인 것이 아니라 실제로 검증하고 변환하는 힘을 가진 권력 객체다.  
+`class-validator`와 `class-transformer`가 그런 힘을 부여한다.
+
+### 설치
+```bash
+pnpm i class-validator class-transformer
+```
+
+### DTO의 필요성
+DTO를 사용하기 전에는 클라이언트에서 데이터를 다음처럼 받았다.
+```ts posts.contoller.ts
+@Post()
+@UseGuards(AccessTokenGuard)
+postPosts(){
+  @User('id') userId: number,
+  @Body('title') title: string,
+  @Body('content') content: string,
+}{}
+```
+
+이때 `@Body`를 개별적으로 받지 않고 하나의 객체로 받는다면 이런 모습일 텐데
+```ts posts.contoller.ts
+@Post()
+@UseGuards(AccessTokenGuard)
+postPosts(){
+  @User('id') userId: number,
+  // focus
+  @Body() body: {title: string, content: string},
+}{}
+```
+
+바디 객체를 타입으로만 작성해서는 실제 그를 검증할 힘이 없다. <q>DTO</q>의 쓸모가 여기서 생겨난다.
+
+### DTO 작성
+- 먼저 바디 객체에 들어오는 데이터를 클래스로 작성한다(제네릭이나 인터페이스를 사용하면 메타데이터 정보를 잃어버리기 때문에 꼭 클래스로 만든다[^2]).
+  ```ts create-post.dto.ts
+  export class CreatePostDto {
+    title: string;
+    content: string;
+  }
+  ```
+- 그러면 곧장 이전의 타입을 대체할 수 있는데,
+  ```ts posts.contoller.ts
+  @Post()
+  @UseGuards(AccessTokenGuard)
+  postPosts(){
+    @User('id') userId: number,
+    // focus
+    @Body() dto: CreatePostDto,
+  }{}
+  ```
+- 하지만 이렇게 타입만 정의하는 걸로는 충분하지 않다고 말한 바 있다.
+- class-validator의 데코레이터를 사용하여 검증 기능을 추가한다.
+  ```ts create-post.dto.ts
+  export class CreatePostDto {
+    @IsString()
+    title: string;
+
+    @IsString()
+    content: string;
+  }
+  ```
+- `@IsString` 데코레이터는 해당 프로퍼티의 데이터가 문자열인지 검사한다. 맞다면 통과, 아니라면 에러를 낸다.
+- DTO는 모든 엔드포인트에 통하도록 main.ts에서 전역으로 등록한다.
+  ```ts main.ts
+    async function bootstrap() {
+    const app = await NestFactory.create(AppModule);
+    
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        transformOptions: {
+          enableImplicitConversion: true,
+        },
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
+
+    await app.listen(3000);
+  }
+  bootstrap();
+  ```
+  - 당연히 `@Body` 뿐만 아니라 모든 파라미터 데코레이터에 대해 DTO를 적용할 수 있다.
+
+### DTO 에러 메시지
+- 기본적인 방법은 데코레이터 안에 메시지를 작성하는 것이다.
+```ts create-post.dto.ts
+export class CreatePostDto {
+  @IsString({
+    message: 'title은 string 타입을 입력해야 합니다'
+  })
+  title: string;
+
+  @IsString({
+    message: 'content requires string type.'
+  })
+  content: string;
+}
+```
+
+- 에러가 난 경우 다음의 응답을 받게 된다.
+```ts bash
+{
+  "statusCode": 400,
+  "error": "Bad Request",
+  "message": ["title은 string 타입을 입력해야 합니다"]
+}
+```
+
+### DTO의 유틸리티
+그런데 대부분의 경우 우리가 클라이언트에서 요구하는 데이터는 이미 엔티티로 작성됐을 확률이 높다. 그러면 일일이 프로퍼티를 작성하는 것은 번거로운 일이다.  
+ NestJS에서는 타입스크립트의 대표적인 유틸타입 `Pick`, `Omit`, `Partial`과 똑같은 기능을 여기에서 제공한다. 역할은 같은데, 제네릭이 아닌 함수 형태로 사용할 뿐이다.
+```ts create-post.dto.ts
+export class CreatePostDto extends PickType(PostModel, ['title', 'content']){}
+```
+
+- 이러면 PostModel의 title과 content 프로퍼티를 자동으로 상속받는다.
+- 기존에 작성했던 검증 데코레이터와 에러 메시지는? 그대로 엔티티의 해당 프로퍼티에 붙여주면 된다. 그럼 검증이 적용된 엔티티를 상속받고, 효력은 그대로 유지된다.
+  ```ts post.entity.ts
+  @Entity()
+  export class PostModel extends BaseModel {
+    @Column()
+    @IsString({
+      message: 'title은 string 타입을 입력해야 합니다'
+    })
+    title: string;
+
+    @Column()
+    @IsString({
+      message: 'content는 string 타입을 입력해야 합니다'
+    })
+    content: string;
+  }
+  ```
+- `@IsString` 외에 다양한 데코레이터가 있으니 적재적소에 맞게 사용한다.
+
+### 에러 메시지 일반화하기
+검증 데코레이터에는 `validationOptions`를 받는 파라미터가 있다. `@IsString`에 전달했던 message가 그 예였는데, 사실 메시지는 `String` 타입뿐만 아니라 함수 형태로도 전달할 수 있다.
+```ts
+ ValidationOptions.message?: string | ((validationArguments: ValidationArguments) => string)
+```
+
+가령 문자 길이를 검증하는 데코레이터를 작성한다고 하자.  
+메시지를 함수로 작성하면 `ValidationArguments`라는 아규먼츠를 받는데, 이 아규먼츠를 까보면 다음과 같은 프로퍼티들이 나온다.
+- value: 검증되고 있는 값(= 클라이언트에서 들어온 값)
+- constraints: 앞서 파라미터로 입력받은 값들. 아래 `@Length` 데코레이터에서는 1과 20을 의미.
+- targetName: 검증이 진행되고 있는 엔티티 또는 DTO의 클래스 이름.
+- object: 검증되고 있는 객체. DTO를 적용시킨 객체의 이름.
+- property: 검증이 이루어지는 프로퍼티 이름(해당 데코레이터가 달린 엔티티나 DTO의 프로퍼티 이름).
+```ts
+@Length(1, 20, {
+  message(args: ValidationArguments){
+    const {contraints, property, value} = args;
+
+    if(contraints.length === 2){
+      return `${property}는 ${contraints[0]}~${constraints[1]} 글자를 입력해주세요.`
+    } else (contraints.length === 1){
+      return `${property}는 최소 ${contraints[0]} 글자를 입력해주세요.`
+    }
+  }
+})
+```
+
+그러면 이 데코레이터가 적용된 프로퍼티는 검증을 실패했을 때 조건에 해당하는 에러 메시지를 내보낸다. 근데 가독성이 떨어지는 감이 있으니 따로 작성하고 불러오는 식으로 갈무리해도 좋을 것 같다.
+<CH.Code>
+```ts length-validation.message.ts
+export const lengthValidationMessage = (args: ValidationArguments) => {
+  const {contraints, property} = args;
+
+  if(contraints.length === 2){
+    return `${property}는 ${contraints[0]}~${constraints[1]} 글자를 입력해주세요.`
+  } else (contraints.length === 1){
+    return `${property}는 최소 ${contraints[0]} 글자를 입력해주세요.`
+  }
+}
+```
+---
+```ts post.entity.ts
+@Length(3, 8, {
+  message: LengthValidationMessage,
+})
+```
+</CH.Code>
+
+
+<br />
+#### 참고링크
+[^1]: <Lnk text='Object schema validation' href='https://docs.nestjs.com/pipes#object-schema-validation' />
+[^2]: <Lnk text='Auto-validation' href='https://docs.nestjs.com/techniques/validation#auto-validation' />

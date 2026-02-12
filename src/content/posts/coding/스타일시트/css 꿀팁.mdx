@@ -1,0 +1,99 @@
+---
+title: "CSS 꿀팁 모음 (feat.Tailwind)"
+date: '2024-08-14'
+categories: coding
+tags: 스타일시트
+description: collection
+---
+<HeadingNavigator />
+
+CSS 구현하며 찾아본 자잘한 팁들을 담았다. 하나하나 작성하자니 과한 감이 있고, 찾아보기도 불편해 한 페이지에 담아두려고 한다~ 가보자고
+
+### 1. 오토필 배경색 제거
+인풋의 이메일/아이디 등을 자동완성시킬 때 배경색은 브라우저에서 강제 지정한다. 옅은 노랑이나 파랑색을 띠게 되는데 보통의 방법으로는 없앨 수 없다. 가령 아래와 같이 `tailwind`에서
+```jsx
+  <input
+    className="autofill:!bg-transparent"
+  />
+```
+!important로 덮어써도 소용없다. 브라우저가 우선권을 가지고 있고 이를 바꿀 수 없는 것.  
+그래서 사람들은 편법을 썼는데, 좋다, 브라우저 너해라, 대신 그거 속도 느리게 만들거임ㅇㅇ 으로 태세를 전환했다. 즉, 브라우저가 지정한 배경색을 건들 수 없으니 이 색이 구현되는 시간을 `transition`을 사용해 늦춘 것이다.  
+```ts tailwind.config.js
+addUtilities({
+  ".remove-autofill-bg": {
+    transition: "background-color 9999s ease-in-out 0s",
+    // "box-shadow": "none",
+    // "-webkit-box-shadow": "none",
+    // "-webkit-text-fill-color": "#000",
+  },
+})
+```
+특정한 색을 입히고 싶으면 `box-shadow`에 색을 주면 된다. 나처럼 단지 색을 없애고(`transparent`) 싶은 거라면 브라우저의 `background-color` 렌더링을 지연시키는 걸로 충분하다.  
+<br/>
+- <b>참고문서</b>
+  - <Lnk text='input 태그 자동완성 시 배경색 변경' href='https://velog.io/@docchi/input-%ED%83%9C%EA%B7%B8-%EC%9E%90%EB%8F%99%EC%99%84%EC%84%B1-%EC%8B%9C-%EB%B0%B0%EA%B2%BD%EC%83%89-%EB%B3%80%EA%B2%BD' />
+
+### 2. 스크롤바 숨기기
+스크롤바를 숨기거나 얇게 만들고 싶을 때 사용한다. 다양한 커스터마이징이 가능하긴 한데, 사파리에서 스크롤바의 색이나 넓이를 지정하는 속성을 지원하지 않아 단순하게 가는 게 좋은 것 같다. 통일성 챙겨 눈치 챙겨~
+
+```ts tailwind.config.js
+addComponents({
+  ".scrollbar-hide": {
+    scrollbarWidth: "none", // 사파리 지원 x
+    "-ms-overflow-style": "none", // 파이어폭스
+    "&::-webkit-scrollbar": { // 크로미움, 사파리..
+      display: "none",
+    },
+  },
+
+  ".scrollbar-thin": {
+    "scrollbar-width": "thin", // 사파리 지원 x
+    "-ms-overflow-style": "auto", // 파이어폭스
+    "&::-webkit-scrollbar": { // 크로미움, 사파리..
+      display: "block",
+    },
+  },
+})
+```
+<br/>
+- <b>참고문서</b>
+  - <Lnk text='MDN 공식문서' href='https://developer.mozilla.org/en-US/docs/Web/CSS/scrollbar-width' />
+
+### 3. Tailwind - Child 선택
+`[&_tag]`를 사용해서 해당 태그에 일괄 접근할 수 있다.
+```tsx
+<div className="[&_span]:bg-black">
+  <span>하나</span>
+  <span>둘</span>
+</div>
+```
+<br/>
+- <b>참고문서</b>
+  - <Lnk text='Tailwind 공식문서' href='https://tailwindcss.com/docs/hover-focus-and-other-states' />
+
+
+### 4. Tailwind - 변수 활용
+tailwind에서 대괄호를 열고 임의의 값을 사용할 때(ex-`text-[#10FF11]`) 상태값이나 변수를 전달하고 싶을 때가 있다. 이때 백틱을 써서 변수를 전달하려 한 적 아마 한번쯤은 있을 것이다. 하지만 tailwind는 아무런 반응이 없다.  
+이때 방법은 해당 요소에 임의의 attribue를 설정하는 것이다.
+```tsx
+<SelectItem
+  key={value}
+  value={value.toString()}
+  // mark
+  unit-value={unit}
+  className={cn(
+    "hover:text-primary-foreground",
+    typeof value === "number" &&
+      unit &&
+      // mark
+      "after:content-[attr(unit-value)]",
+  )}
+>
+  {value}
+</SelectItem>
+```
+그러면 className에서는 `unit-value`에 넘긴 값을 `attr`을 사용해 읽어들일 수 있다.
+
+<br/>
+- <b>참고문서</b>
+  - <Lnk text='how to pass dynamically text at pseudo class in tailwind css' href='https://stackoverflow.com/questions/75662277/how-to-pass-dynamically-text-at-pseudo-class-in-tailwind-css-aftercontent' />

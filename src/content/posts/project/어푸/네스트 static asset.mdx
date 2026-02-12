@@ -1,0 +1,48 @@
+---
+title: Nest.js에서 static asset에 접근할 수 없는 문제
+date: "2024-10-20"
+categories: project
+tags: [어푸, 에러픽스]
+description: 백엔드
+---
+<HeadingNavigator />
+
+### 발단
+기존 Nest.js에서 제공하는 `@nestjs/serve-static`를 사용했는데 에러가 났다.
+
+```ts app.module.ts
+ServeStaticModule.forRoot({
+  rootPath: join(__dirname, "..", "public")
+  serveRoot: "/public"
+})
+```
+
+퍼블릭 폴더에서 하위 폴더를 찾아야했는데 `/public/index.html`이 없다는 메세지를 던졌다.
+나는 html을 서빙하고 싶은 게 아니라 asset 폴더로 public을 사용하려는 건데, 뭔지 싶었다.
+
+> In order to serve static content like a Single Page Application (SPA) we can use the ServeStaticModule from the @nestjs/serve-static package.
+
+추측으로는 SPA 앱에서만 적용되는 방식이라는 것. Next.js를 이용하여 SSR을 전제로 한다면 에러가 날 수 있는 것 같았다.
+
+### 해결
+
+찾아보니 이런 대안이 있다.
+
+```ts main.ts
+const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  ...
+  app.useStaticAssets(path.join(__dirname, '..', 'public'), {
+    prefix: "/public"
+  })
+```
+
+`NestExpressApplication`을 제네릭으로 명시해주면(따로 설치할 필요 없이 불러와진다)
+`useStaticAssets`란 미들웨어가 오토힌트로 제공된다.
+
+ServeStaticModule에 넣었던 것처럼 알맞은 경로를 셋팅하니 에러없이 이미지 경로를 찾아간다
+
+<br/>
+<br/>
+---
+#### 참고문서
+1. <Lnk text='How to return imagefrom external API using Nestjs?' href='https://3-stack.tistory.com/61' />

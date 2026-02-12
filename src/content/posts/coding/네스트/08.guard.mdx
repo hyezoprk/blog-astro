@@ -1,0 +1,74 @@
+---
+title: Guard
+date: "2023-11-22"
+categories: coding
+tags: "네스트"
+description: "08"
+---
+
+<HeadingNavigator />
+
+### 가드
+
+가드는 잘못된 요청을 받았을 때 엔드포인트 함수 실행을 저지시키는 역할을 한다. 토큰이 없거나 만료된 토큰을 가지고 있는 경우가 잘못된 요청의 좋은 예시다.  
+앞서 `Pipe`와 유사한 감이 있지만, 파이프의 검증 대상은 파라미터에 한정되는 반면 가드는 요청 자체를 대상으로 한다.  
+가드 역시 `@Injectable()` 데코레이터를 사용하여 정의한다.
+- 가드들은 모두 `CanActivate` 인터페이스를 구현하게 되어 있다.
+- 그 청사진을 따르면 `canActivate()` 메소드를 작성할 것이 요구된다.
+- 자동완성으로 메소드를 불러오면 `context`를 파라미터로 받고 있다.
+
+### 토큰 검증 가드
+`context` 안에는 `switchToHttp()` 메소드가 있다. 이 메소드를 통해 `Request`와 `Response` 객체에 접근할 수 있다.  
+<q>JWT Authentication</q> 로직에 의해 `Request` 객체에 토큰이 실려올 텐데, 가드는 이에 대한 검증 로직을 수행하기에 안성맞춤인 곳이다.  
+<br/>
+대략적인 흐름은 다음과 같다
+1. 요청 객체의 authorization header로부터 토큰을 받는다.
+2. 토큰타입을 검증하고(Basic | Bearer) 토큰값을 추출한다.
+3. 베이직 토큰인 게 확인되면 email과 password를 추출한다.
+4. email과 password를 이용해서 사용자를 조회한다.
+5. 찾아낸 사용자 정보를 req 객체에 넣는다.  
+  - req 객체에 넣어두면 라이프 사이클 과정에서 유저 정보를 req에서 쉽게 접근할 수 있다. 매번 데이터베이스를 조회하는 일을 절약한다.
+
+```ts
+@Injectable()
+export class BasicTokenGuard implemnets CanActivate {
+  constructor(private readonly authService: AuthService){}
+  
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest() satisfies Request & {user: UserModel};
+    const rawToken = req.headers.authorization;
+    if(!rawToken) throw new UnauthorizationException('토큰이 없습니다');
+  
+    const token = this.authService.extractTokenFromHeader(rawToken);
+    const { email, password } = this.authService.decodeBasicToken(token);
+    const user = await this.authService.authenticateWithEmailAndPassword(email, password);
+
+    req.user = user;
+
+    return true;
+  }
+}
+```
+- 가드는 패스냐 논패스냐를 가르기 때문에 `boolean`을 반환한다. `true`일 경우 요청을 통과/진행시키고, 아닐 경우 에러를 내게 설정한다.
+- 가드 역시 `@Injectable`을 쓰는 클래스, 즉 프로바이더다. 어딘가에 주입되지만 자기도 역시 `constructor`를 통해 의존성을 주입받을 수 있다.
+
+### 가드 적용하기
+```ts
+@Delete(':id')
+@UseGuards(AccessTokenGuard)
+deletePost(
+  @Param('id', ParseIntPipe) id: number,
+  @Request() req: Request & {user: UserModel},
+) {
+  return this.postsService.deletePost(id);
+}
+```
+- 가드를 통과하면 서비스가 실행된다.
+- 정확히는 가드 다음에 파이프가 실행되고, 파이프가 통과하면 서비스가 실행된다.
+- 그래서 @Request()까지 갔다면 그 안에는 반드시 req.user가 들어 있다.
+- 앞으로 유저 정보를 req에서 받을 수 있다.
+
+
+<br />
+#### 참고링크
+1. <Lnk text='Guards' href='https://docs.nestjs.com/guards' />

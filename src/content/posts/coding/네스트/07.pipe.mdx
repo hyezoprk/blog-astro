@@ -1,0 +1,104 @@
+---
+title: Pipe
+date: "2023-11-21"
+categories: coding
+tags: "네스트"
+description: "07"
+---
+
+<HeadingNavigator />
+
+### 파이프
+<small>Pipe</small>
+
+파이프는 기능적으로는 미들웨어와 비슷하다. 하지만 미들웨어는 컨트롤러가 실행되기 전에 작동하는 반면 파이프는 컨트롤러가 실행된 후에 작동한다. 이 타이밍을 이용해서 파이프는 컨트롤러의 파라미터를 변환하거나 유효성 검사를 수행하는 데 사용된다.
+- transformer: 데이터의 형변화를 한다.
+- validator: 데이터의 유효성 검사를 한다.
+
+가령 패스 파라미터, 쿼리 파라미터를 받는 경우 항상 `String` 타입으로 오는데, 실제 서비스에서는 `number` 타입으로 필요한 경우가 많다.
+```ts
+@Get(':id')
+getPost(
+  @Param('id') id: string,
+){
+  return this.somethingService.someMethod(+id);
+}
+```
+
+파이프가 개입하는 부분이 바로 여기다.
+```ts xx.controller.ts
+@Get(':id')
+getPost(
+  // mark[16:27]
+  // focus 
+  @Param('id', ParseIntPipe) id: number,
+){
+  return this.somethingService.someMethod(id);
+}
+```
+빌트인 파이프인 `ParseIntPipe`를 사용해서 `id` 파라미터를 `number` 타입으로 변환했다. 이렇게 두번째 파라미터에 파이프를 사용하면 원래 데이터를 조작할 수 있다. 만약 파이프에서 잘못이 생기면 바디로 내려가기 전에 에러가 나 실행을 방지한다.
+
+이외 기본 파이프에 대해서는 공식문서를 참고한다[^1].
+
+
+### 커스텀 파이프
+<small>Custom Pipe</small>
+
+앞선 예시에서는 타입 변환만 했지만, 파이프는 실제론 데이터 값을 변환하거나 유효성을 검사하는 등 다양한 일을 수행한다. 그럼 커스텀 파이프를 만들어서 사용해보자.
+
+```ts
+import { PipeTransform, Injectable, ArgumentMetadata, BadRequestExceiption } from '@nestjs/common'
+
+@Injectable()
+export class PasswordPipe implements PipeTransform {
+  transform(value: any, metadata: ArgumentMetadata){
+    if(value.length > 8) throw new BadRequestException('비밀번호는 8자 이하로 입력해주세요');
+     
+    return value.toString();
+  }
+}
+```
+- 파이프들은 모두 `PipeTransform` 인터페이스를 구현하게 된다.
+- 그 청사진을 따르면 `transform` 메소드를 작성할 것이 요구된다.
+- 자동완성으로 메소드를 불러오면 `value`와 `metadata`를 파라미터로 받고 있다.
+  - `value`는 컨트롤러에서 넘어온 값이다. 이전 예시로 들면 `String` 타입의 id 값이다.
+  - `metadata`는 파이프가 적용된 파라미터의 메타데이터를 담고 있다(쓸일은 많지 않은 것 같다).
+    - type: body나 query, param, custom 등의 정보.
+    - data: 파라미터 데코레이터에 전달되었던 키값. 이전 예시로 들면 `id`를 말한다.
+    - metatype: 원래 value의 타입. 이전 예시로 들면 `String`을 말한다.
+
+```ts
+@Post
+postRegisterEmail(
+  @Body('email') email: string,
+  // mark[21:32]
+  @Body('password', PasswordPipe) password: number;
+){
+  ...
+}
+```
+- `PasswordPipe`는 validator로서 들어오는 값을 검사하고 있다.
+- 조건 미달인 경우 에러를 던진다.
+- 파이프에서 에러에 걸린 경우 함수 바디의 로직은 실행되지 않는다.
+
+### 디폴트 파이프
+```ts
+@Post
+postRegisterEmail(
+  @Body('isPublic', new DefaultValuePipe(true)) isPublic: boolean,
+){}
+```
+- `DefaultValuePipe`는 파이프의 인자로 기본값을 받는다.
+- 커스텀 파이프를 만들 땐 `@Injectable` 데코레이터를 붙였다. 그래서 클래스명만 써도 IoC 컨테이너에 의해 자동 주입이 되었다. 하지만 `DefaultValuePipe`는 직접 `new` 키워드를 사용해서 인스턴스를 생성해야 한다. 결과에서 차이는 없다.
+- 사실상 쓸 일이 많지 않을 것 같다.
+
+### 그외
+- 파이프는 컨트롤러의 파라미터에만 적용할 수 있다.
+- 한 파라미터에 여러 개의 파이프를 적용할 수 있다.
+- 파이프가 인자를 받아야 하는 경우 `new` 키워드를 사용해서 인스턴스를 생성해야 한다.
+
+<br />
+#### 참고링크
+[^1]: <Lnk text='빌트인 파이프' href='https://docs.nestjs.com/pipes#built-in-pipes' />
+
+

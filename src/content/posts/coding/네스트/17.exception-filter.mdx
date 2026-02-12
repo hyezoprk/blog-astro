@@ -1,0 +1,45 @@
+---
+title: 예외 처리
+date: "2023-12-02"
+categories: coding
+tags: "네스트"
+description: "17"
+---
+
+<HeadingNavigator />
+
+### Exception Filter
+- ExceiptionFilter 인터페이스를 구현하여 필터를 만든다.
+- `@Catch` 어노테이션을 사용하여 `HttpException`을 캐치하고 이를 확장한다.
+  ```ts focus=11:17
+  @Catch(HttpException)
+  export class HttpExceptionFilter implements ExceptionFilter {
+    catch(exception: HttpException, host: ArgumentHost) {
+      const ctx = host.switchToHttp();
+      const res = ctx.getResponse();
+      const req = ctx.getRequest();
+      const status = exception.getStatus();
+
+      response
+        .status(status)
+        .json({
+          statusCode: status,
+          message: exception.message,
+          timeStamp: new Date().toLocalString('kr'),
+          path: req.url,
+        })
+    }
+  }
+  ```
+  - 이 필터는 모든 `HttpException`에 대해 적용된다. 즉 그를 하이재킹한다.
+  - 발생하는 모든 http error를 수정하여 내보낼 수 있다.
+  - 어떤 내용으로 내보낼지 json을 적절히 구성한다.
+
+그런데 실제 서비스에서 이렇게 에러 내용을 바꾸는 경우는 많지 않다. 기존에 NestJS의 빌트인 에러로도 충분히 에러 내용을 파악할 수 있기 때문이다.  
+오히려 이런 상황에 적절하다: 에러를 감지한 후 로그파일을 생성하거나 에러 모니터링 시스템에 API 콜을 넣을 때.  
+
+### 전역적으로 필터 적용하기
+`main.ts`에 생성한 필터를 적용하면 따로 어노테이션을 넣지 않아도 모든 에러에 대해 필터를 적용시킬 수 있다.
+```ts main.ts
+app.useGlobalFilters(new HttpExceptionFilter());
+```

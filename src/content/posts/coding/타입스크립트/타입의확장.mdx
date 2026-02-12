@@ -1,0 +1,168 @@
+---
+title: 타입의 확장
+date: '2023-01-27'
+categories: coding
+tags: 타입스크립트
+description: "feat"
+series: "Total TS"
+---
+<HeadingNavigator />
+
+> <figcaption>(Matt Pocock의 강의[^1]를 정리한 시리즈입니다.)</figcaption>
+
+### 유니언 타입을 확장하기
+아래 `Origin` 타입을 베이스로 `After`를 만들어내는 것이 목표다. 타입이 `user`일 경우 `userId`가, 타입이 `comment`일 경우 `commentId`가 자동완성으로 뜨게끔 하는 것이다.
+
+<CH.Code>
+```ts type.ts
+export type Origin = 
+  | {
+    type: "user";
+  }
+  | {
+    type: "post";
+  }
+  | {
+    type: "comment";
+  }
+
+type After = 
+  | {
+    type: "user";
+    userId: string;
+  }
+  | {
+    type: "post";
+    postId: string;
+  }
+  | {
+    type: "comment";
+    commentId: string;
+  }
+```
+---
+```ts example.ts
+@ts-expect-error
+const result: MyType = {
+  type: "user",
+  userId: "1"
+}
+```
+</CH.Code>
+
+### 접근
+
+<CH.Spotlight>
+```ts index.ts
+type MyType = {
+  ...  
+}
+```
+---
+- 우선 `Origin`의 유니언 타입에서 `type`의 값을 가져온다.  
+키 인덱스 시그니처를 이용한다.
+```ts index.ts focus=2:4
+type MyType = {
+  [OriginTypes in Origin["type"]]: {
+    type: OriginTypes;
+  }
+}
+```
+---
+- 디스트럭션으로 바깥 오브젝트를 풀어준다.
+```ts index.ts focus=2:5 mark=5[2:17]
+type MyType = {
+  [OriginTypes in Origin["type"]]: {
+    type: OriginTypes;
+  }
+}[Origin["type"]]  // user | post | comment 
+```
+---
+- 그러면 이런 결과를 가지게 될 텐데
+```ts result.ts
+type MyType =
+  | {
+    type: "user" 
+  }
+  | { 
+    type: "post"
+  }
+  | { 
+    type: "comment"
+  }
+```
+---
+- 데이터 추가를 위해 `Record`를 쓴다.  
+`Record`는 인덱스 시그니처처럼 오브젝트의 프로퍼티(키 밸류 한쌍)를 다이나믹하게 터주는 효과를 가지고 있다.  
+이 경우엔 키값을 리터럴 타입으로, 배정받은 `type`값을 할당하면서 새로운 프로퍼티로 합류시켰다.
+```ts index.ts focus=4
+type MyType = {
+  [OriginTypes in Origin["type"]]: {
+    type: OriginTypes;
+    // focus
+  } & Record<`${OriginTypes}Id`, string>
+}[Origin["type"]]
+```
+</CH.Spotlight>
+
+### 제네릭으로 갈무리
+위의 코드를 제네릭으로 갈무리하면 다음과 같다.
+
+```ts index.ts
+type Origin =
+  | {
+    type: "user";
+  }
+  | {
+    type: "post";
+  }
+  | {
+    type: "comment";
+  };
+
+type MyType1<T extends Record<string, string>> = {
+  [K in keyof T]: {
+    type: T[K];
+  } & Record<`${T[K]}Id`, string>;
+}[keyof T];
+
+const result: MyType1<Origin> = {
+  // mark[10:13]
+  type: "post",
+  // 위의 타입이 아래 id의 접두어로 자동완성된다.
+  // mark[3:8]
+  postId: '1'
+}
+```
+
+특수한 구조에 대한 맞춤 타입이라 제네릭으로 쓸 이유야 없겠지만, 공부니까 그냥 해봤다. 
+
+
+### 이번 포스트를 통해 새로 알거나 정리된 것
+1. 확장의 두 종류
+- `extends`를 통한 상속과 `&(interSection)`을 통한 결합의 차이  
+  - 공통된 뿌리가 있을 땐 상속, 개별적으로 덧대는 상황에서는 인터섹션을 쓴다.  
+2. 인덱스 시그니처의 쓰임
+- `in` 키워드와 결합해 들어올 수 있는 모든 키를 계산한다.
+- `Record`와 일견 비슷하다.
+
+```ts Record
+const Ex1: {[keys: string]: string | number} = {
+  id: 1,
+  name: "hyezo"
+}
+
+const Ex2: Record<string, string | number> = {
+  id: 1,
+  name: "hyezo"
+}
+```
+<br/>
+하지만 인덱스 시그니처는 리터럴 형식을 받지 않는다[^2]. 이 포스트와 같이 특정 모양의 string 키값을 요구해야 하는 경우 `Record`를 쓴다.
+<Img src='/images/2023/typescript/Record.webp' />
+ 
+<br/>
+---
+#### 참고자료
+[^1]: <Lnk text='Total typescript' href='https://www.totaltypescript.com/tips' /> 
+[^2]: <Lnk text='인덱스 시그니처 속성' href='https://www.typescriptlang.org/docs/handbook/2/objects.html#index-signatures' />

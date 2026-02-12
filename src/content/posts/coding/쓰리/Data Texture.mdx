@@ -1,0 +1,150 @@
+---
+title: '[Three-2D] Data Texture'
+date: "2023-09-04"
+categories: "coding"
+tags: "쓰리제이에스"
+description: "Intro"
+---
+
+<HeadingNavigator />
+
+### 데이터 텍스쳐?
+데이터 텍스쳐는 직접 x*y의 매트릭스 만들고 이 위에 픽셀을 생성하는 작업을 의미한다. 이렇게 해서 픽셀을 얻고 나면 하나하나에 접근, 움직임을 제어할 수 있게 된다. 종국에는 `png`, `jpg` 따위의 이미지에서 색상을 추출해 데이터 텍스쳐로 삼는데, 지금은 기본적인 방법부터 알아보자.
+
+### 픽셀값 채우기
+먼저 반복문을 사용해 x*y의 매트릭스를 만든다. 픽셀의 경우 RGBA가 한 단위이기 때문에 사이즈에 4를 곱했다. 여기서 RG가 최소 0, 최대 1의 값을 가지도록 식을 작성한다.
+
+```js sketch.js
+...
+addObjects(){
+  ...
+  this.size = 32;
+  this.number = this.size ** 2;  // 데이터 포인트 (1024개)
+  
+  // Unit8Array (정수)타입 쓸 필요 없다 -> 0 ~ 255. Float32Array로 소수, 랜덤값 겟
+  const data = new Float32Array( 4 * this.number ); // 픽셀당 4개의 포인트를 차지하므로 4를 곱해 사이즈를 유지한다
+  for (let i=0; i < this.size; i++) {
+    for (let j=0; j < this.size; j++) {
+      const index = i * this.size + j;  // 0 ~ 1024
+      data[index * i] = i / (this.size - 1) -> Math.random();   // R: 0 ~ 1 
+      data[index * i + 1] = j / (this.size - 1) -> Math.random();  // G: 0 ~ 1
+      data[index * i + 2] = 0;  // B
+      data[index * i + 3] = 1;  // A
+    }
+  }
+
+  // DataTexture 인스턴스 생성
+  this.positions = new THREE.DataTexture( data, this.size, this.size, THREE.RGBAFormat, THREE.FLoatType ); // RGBA에 정수 대신 floatType을 쓸 경우 그를 알려줘야 함(다섯번째 파라미터까지).
+  this.positions.needsUpdate = true;
+  
+  this.material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uTexture: { value: this.positions }
+    },
+  })
+}
+```
+<br/>
+자, 1024개의 픽셀 데이터를 만들었다. 그럼 이제 셰이더의 `uTexture` 변수에서 이를 만져볼 차례인데, 그전에 한 가지 보충해야 할 게 있다.
+> <b>🐤</b>  
+> 주목할 건 여기서 RG값을 0\~1로 채울 때, 인덱스에 의해 순차적인(그래서 그라데이션인) 값을 주는 대신 `Math.random()`을 사용해도 된다는 점이다. 의도가 있지 않은 한 0\~1 사이의 값만 주면 된다는 것!  
+
+
+### Position과 UV
+앞서 데이터 텍스쳐 생성은 성공리에 끝났지만, 이를 셰이더에서 사용하기 위해서는 포지션과 UV를 설정해줘야 한다. 텍스쳐에 관한 정보가 있다고 하나, 브라우저에서 이 위치를 잡는 건 `vertexShader`의 디폴트 어트리뷰트 `position`이기 때문이다. `uv` 역시 동일한 맥락이다. 
+<br/>
+다만 크게 벗어나는 건 아니고, 결국 포지션에 데이터 텍스쳐가 포개지는 형국이기 때문에, 둘을 겹쳐지게 맞춰준다. 차이라면 `position x, y`가 0을 중심으로 대칭을 띠게 만든다는 점이다. 기존의 값이 0\~1의 범위였으니 -0.5를 붙여 범위를 -0.5\~0.5로 조정한다.  
+`uv`의 경우 텍스쳐의 좌표에 대한 색상 맵핑으로 쓰이며 일단 0\~1값을 유지한다.
+
+
+```js sketch.js
+...
+addObjects(){
+  this.size = 32;
+  this.number = this.size ** 2;
+  this.geometry = new THREE.BufferGeometry();
+  
+  // 데이터의 크기에 맞춰서 생성 후, 셰이더에서 데이터 텍스쳐 값으로 덮어 쓰게 된다.
+  const positions = new Float32Array(this.number * 3) // position이 vec3 타입
+  const uvs = new Float32Array(this.number * 2) // uv가 vec2 타입
+  const data = new Float32Array(this.number * 4);
+  
+  for (let i=0; i < this.size; i++) {
+    for (let j=0; j < this.size; j++) {
+      const index = i * this.size + j;
+
+      // position의 xy는 0.5를 빼서 0을 기준으로 대칭이 되게끔 만들어준다. -0.5 ~ 0.5
+      positions[3 * index] = (j / (this.size - 1)) - 0.5; 
+      positions[3 * index + 1] = (i / (this.size - 1)) - 0.5;
+      positions[3 * index + 2] = 0;
+
+      // uv는 0 ~ 1의 값을 유지한다
+      uvs[2 * index] = j / (this.size - 1);
+      uvs[2 * index + 1] = i / (this.size - 1);
+
+      // 데이터 텍스쳐의 xy도 위의 포지션을 따라 0을 기준으로 - + 대칭을 이루도록 한다
+      data[index * i] = Math.random() * 2 - 1;  // 0~1 (1사분면) 이었던 것을 중앙으로 옮김
+      data[index * i + 1] = Math.random() * 2 - 1; 
+      data[index * i + 2] = 0;  // B
+      data[index * i + 3] = 1;  // A
+    }
+  }
+
+  // 어트리뷰트에 값을 넣어준다
+  this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  this.geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+
+  this.positions = new THREE.DataTexture(data, this.size, this.size, THREE.RGBAFormat, THREE.FLoatType); // floatType을 쓸 경우 그를 알려줘야 함(다섯번째 파라미터).
+  this.positions.needsUpdate = true;
+
+  this.material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uTexture: { value: this.positions }
+    },
+  })
+}
+```
+이제 셰이더로 넘어가 값을 덮어쓸 차례다.
+
+
+### vertexShader
+```glsl vertexShader.glsl
+varying vec2 vUv;
+uniform float uTime;
+uniform sampler2D uTexture;
+
+void main() {
+  vUv = uv;
+  vec3 newpos = position; // 데이터 크기에 맞춘 vertex 위치
+  vec4 color = texture2D(uTexture, vUv); // vUv 컬러가 매핑된 데이터 텍스쳐
+  newpos.xy = color.xy;  // 데이터 텍스쳐의 xy값을 vertex의 xy값으로 덮어쓴다
+  
+  vec4 mvPosition = modelViewMatrix * vec4(newpos, 1.0);
+  
+  gl_PointSize = (10.0 / -mvPosition.z);
+  gl_Position = projectionMatrix * mvPosition;
+}
+```
+
+### fragmentShader
+```glsl fragmentShader.glsl
+varying vec2 vUv;
+uniform sampler2D uTexture;
+void main() {
+  vec4 color = texture2D(uTexture, vUv);
+  gl_FragColor = color;  // 데이터 텍스쳐에서 가져온 컬러색상표 분포
+  gl_FragColor = vec4(vUv, 0.0, 1.0); // 그런데 이렇게 uv로만 표현하면 중구난방으로 채색된다. 왤까?
+  // -> 위의 경우 텍스쳐 포지션과 vUv를 묶어 좌표와 색상이 매칭이 됐지만, 
+  // 두번째의 경우 대응할 좌표계를 갖지 못했기 때문.
+}
+```
+
+### 한계
+하지만 텍스쳐로 포지션을 잡는 건 CPU를 사용하기 때문에 과부하가 걸릴 수 있다. 웬만하면 셰이더로, GPU 연산을 이용해 파티클(픽셀)을 계산하는 방법이 선호된다. 이 기법인 `FBO Technique`을 다음 시간에 다루도록 한다.
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>

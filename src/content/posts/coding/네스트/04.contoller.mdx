@@ -1,0 +1,174 @@
+---
+title: 컨트롤러
+date: '2023-11-15'
+categories: coding
+tags: "네스트"
+description: "04"
+---
+<HeadingNavigator />
+
+### 컨트롤러
+- 컨트롤러는 클라이언트의 요청을 수신하는 관제탑이다.
+- 클라이언트가 어디로 요청을 보낼지, `Endpoint`를 `Method` 별로 정의한다.
+  - NestJS에서 제공하는 Method 데코레이터(@GET, @POST, @PATCH...)를 불러온다
+  - 해당 데코레이터에 넣는 값은 세부 엔드포인트가 된다.
+  - 모든 엔드포인트에 접두어, 공통된 경로를 부여하려면 컨트롤러 데코레이터를 이용한다.
+  - 이 둘의 조합으로 경로가 완성된다.
+  - 구비해둔 경로와 메소드로 요청이 들어오면 해당 함수가 실행된다.
+  ```ts posts.controller.ts
+  @Controller('posts')
+  export class PostsController {
+    // '/posts'로 보내는 Get 요청
+    @GET()
+    getAllPosts(){
+      return somethingPostJson;
+    }
+  }
+  ```
+<br/>
+
+이 요청에 대한 함수의 리턴값이 응답으로 나간다.  
+그리고 NestJS 아키텍쳐는 이때의 응답 로직을 `Service`에서 작성하도록 권장하고 있다. cli로 모듈을 만들 때 서비스가 저절로 주입되어 있는 이유다.  
+물론 컨트롤러에서 로직을 작성해도 결과는 같다. 하지만 그 경우 길어진 코드들로 컨트롤러가 지저분해진다. 컨트롤러가 관문인 만큼 가독성을 챙길수록 좋다. 게다가 서비스를 분리함으로써 코드의 재사용성도 높아지니 굳이 나누지 않을 이유가 없다.
+
+### 파라미터 데코레이터
+그럼 서비스로 어떤 정보들을 넘겨줘야 할까?  
+클라이언트에서 받아내는 정보는 크게 세 가지로 나눠볼 수 있다.  
+- `URL`에 담겨오는 부분
+  - 패스 파라미터
+  - 쿼리 파라미터
+- `Body`에 담겨오는 부분
+  - 폼 데이터
+  - 파일
+- `Header`에 담겨오는 부분
+  - 인증 토큰(JWT), 쿠키 등
+<br/>
+NestJS는 다양한 데코레이터로 여기에 접근, 서비스로 전달할 수 있다.  
+<br/>
+1. @Param()
+  - <b>패스 파라미터</b>를 받는 데코레이터다.
+  - 특정값을 넣지 않으면 전체 패스 파라미터를 오브젝트로 받는다.
+  - 예제 코드
+    <CH.Scrollycoding>
+    1. 패스 파라미터 식별하기
+    ```ts posts.controller.ts
+
+       
+    @Controller('posts')
+    export class PostsController {
+      // focus[7:17]
+      @GET(':postId') 
+      getPosts(){
+        return this.postsService.somethingMethod();
+      }
+    }
+    ⁣
+    ⁣
+    ```
+    ---
+    2. @Param() 데코레이터로 받기
+    ```ts posts.controller.ts
+    @Controller('posts')
+    export class PostsController {
+      @GET(':postId') 
+      getPosts(
+        // focus
+        @Param('postId') id: string;
+      ){
+        return this.postsService.somethingMethod();
+      }
+    }
+    ```
+    ---
+    3. 서비스 로직에 넘기기
+    ```ts posts.controller.ts
+    @Controller('posts')
+    export class PostsController {
+      @GET(':postId') 
+      getPosts(
+        @Param('postId') id: string;
+      ){
+        // focus
+        return this.postsService.somethingMethod(+id);
+      }
+    }
+    ```
+    </CH.Scrollycoding>
+<br/>    
+2. @Query()
+- <b>쿼리 파라미터</b>를 받는다.
+- 특정값을 넣지 않으면 전체 쿼리 파라미터를 오브젝트로 받는다.
+- 가령 '/posts?page=1&order=desc'에서 쿼리는 `page`와 `order`다.
+- 예제 코드
+  ```ts posts.controller.ts
+  @Controller('posts')
+  export class PostsController {
+    @Get()
+    async getPosts(
+      @Qyery() query: {page: string, order: string},
+    ) {
+      return this.postsService.getPosts(qeury);
+    }
+  }
+  ```
+<br/>  
+
+3. @Body()
+- <b>폼 데이터</b>를 받는 데코레이터다.
+- 특정값을 넣지 않으면 전체 바디를 오브젝트로 받는다.
+- 예제 코드
+  ```ts posts.controller.ts
+  @Controller('posts')
+  export class PostsController {
+    @Post()
+    postPost(
+      @Body() body: {title: string, content: string},
+    ){
+      return this.postsService.createPost(qeury);
+    }
+  }
+  ```
+<br/>  
+
+4. @Headers()
+- <b>헤더(메타데이터)</b>를 받는 데코레이터다.
+- 대표적으로 `authorization`을 받는다.
+- 예제 코드
+  ```ts posts.controller.ts
+  @Controller('posts')
+  export class PostsController {
+    @Post()
+    loginEmail(
+      @Headers('authorization') rawToken: string
+    ){
+      return this.authService.loginWithEmail(rawToken);
+    }
+  }
+  ```
+<br/>  
+
+
+5. @Request()
+- <b>리퀘스트 객체</b>를 받는 데코레이터다.
+- 나중에는 커스텀 데코레이터를 만들어서 필요한 값만 전용으로 빼올 때가 많다.
+- 예제 코드
+  ```ts posts.controller.ts
+  @Controller('posts')
+  export class PostsController {
+    @Post()
+    loginEmail(
+      @Request() req: Request & {user: UserModel}
+    ){
+      return this.authService.loginWithEmail(rawToken);
+    }
+  }
+  ```
+<br/>  
+---
+<br/>  
+이 정도가 컨트롤러가 수행하는 기본 역할이다. 추가적으로 `Pipe`, `Interception`, `Guard`, `DTO` 등이 사용되는 곳도 바로 컨트롤러인데, 이는 각각을 다루는 지면에서 자세히 다뤄보려고 한다.  
+<br/>
+투비 컨티뉴 🍒
+<br/>
+#### 참고링크
+- [NestJS 공식문서](https://docs.nestjs.com/)

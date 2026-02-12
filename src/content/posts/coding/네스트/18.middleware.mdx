@@ -1,0 +1,55 @@
+---
+title: 미들웨어
+date: "2023-12-03"
+categories: coding
+tags: "네스트"
+description: "18"
+---
+
+<HeadingNavigator />
+<Img src='/images/nest/cycle.png' />
+
+### 미들웨어
+<small>Middleware</small>
+
+미들웨어는 요청-응답의 라이프 사이클 단계에서 가장 먼저 요청을 받는 역할을 한다. 기본적으로 `express`의 미들웨어와 동일하다.
+
+미들웨어는 아래의 특징을 가진다.
+- 올인원 툴 같은 느낌. 특정 기능에 특화되어 있다기보단 어떤 코드든 실행할 수 있는 만능 노트다.
+- 이어지는 파이프들과 겹치는 부분이 많기 때문에 역할을 적당히 분담한다.
+- `req`를 읽어서 할 수 있는 일
+  - params를 검증하거나
+  - authorization 헤더를 검증하거나
+  - 기타 등등
+- `next()`를 실행해야 다음 단계(가드)로 넘어간다.
+  ```ts
+  @Injectable()
+  export class LogMiddleware implements NestMiddleware {
+    use(req: Request, res: Response, next: NextFunction) {
+      console.log(`[REQ 미들웨어] ${req.url} ${new Date().toLocaleString('kr')}`);
+      next();
+    }
+  }
+  ```
+- 특이점은 요청의 `method` 또는 경로 별로 미들웨어를 등록할 수 있다는 점이다. 이 특성을 잘 활용한다. 원한다면 특정 컨트롤러 전체에 미들웨어를 걸 수도 있다.
+  ```ts
+  export class PostsModule implements NestModule {
+    configure(consumer: MiddlewareConsumer) {
+      consumer.apply(LogMiddleware).forRoutes({
+        path: 'posts*',
+        method: RequestMethod.ALL,
+      });
+    }
+  }
+  ```
+  - 모듈에 `NestModule`을 구현하고 `configure` 메서드를 구현한다.
+  - `consumer`의 `apply` 메서드에 미들웨어를 등록한다.
+  - `forRoutes` 메서드에 경로와 메서드를 등록한다.
+  - `path`는 `*`를 사용할 수 있다. `*`는 모든 경로를 의미한다.
+  - `.forRoutes(PostsController)`는 컨트롤러의 모든 요청에 대해 미들웨어를 적용한다.
+
+실제 서비스에서는 요청에 대한 로그 파일을 만들거나 그를 모니터링할 수 있는 로직을 미들웨어로 걸어놓는다. `cors`나 `helmet` 같은 보안 패키지도 미들웨어에서 사용한다.
+<br />
+
+#### 참고링크
+1. <Lnk text='Middleware' href='https://docs.nestjs.com/middleware' />

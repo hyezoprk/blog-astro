@@ -1,0 +1,200 @@
+---
+title: RBAC
+date: "2023-12-03"
+categories: coding
+tags: "네스트"
+description: "19"
+pinned: true
+---
+
+<HeadingNavigator />
+
+### 유저만 접근하기
+<small>role based access control</small>
+
+서비스를 운영하면 사실 모든 부분을 비공개로, 폐쇄적으로 운영하지 않는다. 인스타그램이나 X처럼 로그인하지 않아도 어느 정도 틈을 두어 맛보기를 제공한다. 이렇듯 로그인 여부로, 혹은 롤을 기반으로 무엇을 보여주고 숨길지 나누는 케이스는 일반적이고 이를 통칭 <q>알백(RBAC)</q>이라 부른다.
+
+알백은 유저와 비유저, 유저와 관리자 등 직책에 따라 특정 URL에 대한 접근 여부를 결정짓는 테크닉이다. 가령 어떤 글을 삭제하거나 수정하는 권한은 글쓴 사람 당사자이거나 관리자일 때만 가능한 게 상식적일 것이다. 이를 구현하는 것이 알백이다.
+
+### Roles 데코레이터 만들기
+
+이전에 구현한 데코레이터는 `createParamDecorator`를 사용해 컨트롤러에서 사용되는 데코레이터를 만드는 거였다. 하지만 지금 구현하는 RBAC은 파라미터 데코레이터가 아니라 그 이전 시점에서, 즉 가드에서 유저가 가진 직책을 검증할 것이다.  
+NestJS에서 데코레이터는 메타데이터(`reflect-matadata`)를 기반으로 작동하는 기술이다[^1]. `@nestjs/common`은 메타데이터를 설정하는 `SetMetadata` 함수를 제공하고 있어서, 손쉽게 알백 전용 데코레이터를 만들 수 있다.
+
+<CH.Code>
+```ts rbac.decorator.ts
+⁣
+⁣
+⁣
+export const ROLES_KEY = 'user_roles';
+export const Roles = (role: UserRole) => SetMetadata(Roles_key, role);
+⁣
+⁣
+⁣
+```
+```ts posts.controller.ts
+@Delete(':id')
+@UseGuards(AccessTokenGuard)
+// focus
+@Roles(UserRole.ADMIN)
+deletePost(
+  @Param('id', ParseIntPipe) id: number,
+){
+  return this.postsService.deletePost(id);
+}
+```
+</CH.Code>
+
+하지만 메타데이터를 등록했다고 해서 이것만으로 뭔가 되는 건 아니다. 당연하다. 메타데이터가 셋팅됐으니 이를 읽어내서 원하는 작업을 실행하는 로직을 만들어야 한다.
+
+우리가 원하는 작업은 `ADMIN`이냐 아니냐를 따지는 작업이다. 즉 `@Roles` 데코레이션이 활성화된 라우트에 대해 `Guard` 로직이 실행돼야 한다. (정확히 말하면 가드의 검증은 모든 경우에 성사된다. 다만 `@Roles` 데코레이터가 없는 경우 무사 통과시킬 뿐이다. 뒤에 후술)
+
+---
+
+1. Roles 데코레이터에 대한 메타데이터를 읽는다.
+  - 이 역할을 하는 것은 `Reflector`다. `@nestjs/core`에서 제공한다.
+  ```ts roles.guard.ts
+  @Injectable()
+  export class RolesGuard implements CanActivate {
+    constructor(private readonly reflector: Reflector) {}
+
+    canActivate(context: ExecutionContext): boolean | Promise<boolean> {
+      const requiredRole = this.reflector.getAllAndOverride(ROLES_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]);
+
+      if (!requiredRole) return true;
+
+      const { user } = context.switchToHttp().getRequest();
+      if (!user) throw new UnauthorizedException('토큰을 제공해주세요');
+
+      if (user.role !== requiredRole)
+        throw new ForbiddenException(
+          `권한이 없습니다 ${requiredRole} 권한이 필요합니다`,
+        );
+
+      return true;
+    }
+  }
+  ```
+  - `Reflector`는 `getAllAndOverride` 메소드를 제공한다. 이는 메타데이터를 가져오는 메소드다. 첫 번째 인자는 메타데이터 키 값이고, 두 번째 인자는 가져올 대상. 여기서는 메타데이터를 만들 때 등록했던 키 `Roles_key`에 대해 핸들러와 클래스를 가져온다.
+  - 만약 롤이 확인되지 않는다면 `true`를 반환하고 그대로 종료한다. 이는 `@Roles` 데코레이터가 없는 경우, 즉 모든 유저가 접근 가능한 라우트를 의미하기 때문이다.
+  - 이를 통과했다면 `@AccessTokenGuard`를 통해 로그인된 유저다. 이 경우 `req` 안에 `user` 객체가 존재하고 있다. 만약 유저 정보를 찾을 수 없다면 토큰에서 잘못이 있는 것이다.
+  - 그럼 이제 `user.role`과 `requiredRole`을 비교할 수 있다. 유저롤과 `@Roles()`데코레이터에 설정한 값이 일치하지 않는다면 `ForbiddenException` 에러를 던진다. 맞다면 통과시킨다.
+
+### 전역으로 적용하기
+RBAC의 경우 페이지의 보안과 관련된 것이기 때문에 사실 디폴트가 활성화 상태인 것이 좋다. 다시 말해 모든 라우트가 RBAC을 기본으로 사용하고, 일부만 개별적으로 푸는 것이다.  
+그러기 위해 `app.module.ts`에 전역 설정을 등록한다.
+```ts app.module.ts
+...
+providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ClassSerializerInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
+  ...
+```
+> <label className="red" />
+> 주의할 점은, 전역적으로 발동하는 가드는 라우트에 개별적으로 단 가드보다 항상 먼저 실행된다는 점이다. 그러면 액세스토큰 가드보다 알백 가드가 먼저 실행되어, `req`에 있을 유저 데이터를 확인할 수 없다.  
+> 해결책은 간단하다. 액세스 토큰 가드 역시 전역으로, 그렇지만 먼저 실행되게 등록하는 것이다.
+<br />
+
+```ts app.module.ts focus=8:11
+...
+providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ClassSerializerInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: AccessTokenGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
+  ...
+```
+이렇게 하면 어떤 API든 액세스토큰 가드의 검증 대상이 되고, 토큰을 확인할 수 없으면 에러를 내게 된다. 그리고 우리는 이러한 완전한 폐쇄를 지양한다.   
+따라서 노출이 필요한 페이지(가령 메인 페이지나 로그인 페이지)는 추가적으로 `@Public()` 데코레이터를 만들어 토큰 검증을 무마시키도록 한다.  
+```ts public.decorator.ts
+export const IS_PUBLIC_KEY = 'is_public';
+
+export const isPublic = () => SetMetadata(IS_PUBLIC_KEY, true);
+```
+
+메타데이터를 만드는 모습은 똑같다. 하지만 새로운 가드를 만드는 게 아니라 `BearerTokenGuard` 안에 그 정보를 심는다. 그 안에서 `isPublic`이 true로 확인되면 이를 `req`에 기록한다.  
+
+```ts bearer-token.guard.ts
+@Injectable()
+export class BearerTokenGuard implements CanActivate {
+  constructor(
+    private readonly authService: AuthService,
+    private readonly userService: UsersService,
+    private readonly reflector: Reflector,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    const req = context.switchToHttp().getRequest() satisfies Request & {
+      user: Omit<UserModel, 'password'>;
+      isRoutePublic: boolean;
+      token: string;
+      tokenType: TAuthTokenType;
+    };
+
+    // focus
+    if (isPublic) {
+    // focus
+      req.isRoutePublic = true;
+    // focus
+      return true;
+    // focus
+    }
+
+    ...
+  }
+}
+```
+
+그러면 액세스 토큰 가드에서 `req`를 조회하고 이 값을 확인할 수 있게 된다. 만약 이 값이 true로 확인되면 토큰 검증 없이, 그대로 통과시키는 로직을 추가한다.
+```ts access-token.guard.ts
+@Injectable()
+export class AccessTokenGuard extends BearerTokenGuard {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    await super.canActivate(context);
+
+    const req = context.switchToHttp().getRequest();
+    // focus
+    if (req.isRoutePublic) return true;
+
+    if (req.tokenType !== 'access')
+      throw new UnauthorizedException('access_token이 아닙니다.');
+
+    return true;
+  }
+}
+```
+<br />
+> <label className='green' />
+> 클라이언트에서 Request 요청이 들어오면 ➝ 해당 Endpoint에 대한 메타데이터(데코레이터)들이 읽히고 ➝ 미들웨어부터 가드까지의 훅들이 순차적으로 실행된다 ➝ 이 과정에서 탈이 없다면 그때 컨트롤러(메소드)가 나선다. 
+
+<br/>
+---
+
+#### 참고자료
+[^1]: <Lnk text='reflect-metadata 1' href='https://darrengwon.tistory.com/1128' />, <Lnk text='reflect-metadata 2' href='https://owenjeon.github.io/2018/05/13/relect-metadeta/' />

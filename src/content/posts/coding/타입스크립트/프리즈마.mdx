@@ -1,0 +1,167 @@
+---
+title: "프리즈마 이해 고군분투기"
+date: "2022-10-09"
+categories: project
+tags: "블로그 포트폴리오"
+description: prisma
+---
+<HeadingNavigator />
+늘 말하지만 나는 똥멍청이다. 남들은 한번에 딱딱 이해하는 걸 나는 두번 세번 네번은 반복해야 겨우 이해하곤 했다. 코딩은 더하면 더했지 예외일 수 없다. 프리즈마도 확실히 정리하지 않고 유야무야 넘어가니 이게 쓰면서도 좀체 자신이 안 붙는다. 멋모르고 오용할 때도 나는 자신만은 있어야 한다고 생각하는데, `nextAuth`나 `astroAuth`를 다루면서 왔다갔다 헷갈리는 내가 싫었다.  
+<br/>
+프리즈마를 정확한 타이밍에, 또 정확한 위치에서 다룰 수 있도록 개념을 잡아본다. 빠샤 🐣
+<br/>
+---
+<br/>
+<br/>
+<Img src='/images/2022/autumm/스샷_프리즈마3.png' />
+<figcaption>마! 이게 자신감이다!</figcaption>
+### What is Prisma?
+다행인지 불행인지ㅋㅋ <Lnk text='프리즈마' href='https://www.prisma.io/docs/concepts/overview/what-is-prisma' />는 공홈 설명이 지나치리만큼 상세하다. 사용법이야 어떤 집단이든 소상히 기록하기 마련이라지만, 왜 프리즈마인지, 다른 ORMs의 어떤 점을 극복하려 했으며 프리즈마를 씀으로써 얻게 될 이점을(디스를 곁들여) 강하게 어필하고 있다ㅎ 아마 자기들도 빡쳐서 만든 듯  
+<br/>
+여기서 ORM이 뭔지 역사부터 되짚는 건 초점에 어긋나는 일일 것 같다. 이해력이 더딘 나는 그저 프리즈마가 *오브젝트적인 사고(코드)방식*을 DB에 입히려 했으며, *쿼리 형태의 단순함*과 함께 *클라이언트에 타입 안정성과 자동완성 기능*을 보장한다- 정도로만 이해를 세웠다.  
+<br/>
+프론트엔드 입장에서 와닿았던 부분은 이 부분인데
+<Img src='/images/2022/autumm/스샷_프리즈마1.webp' />
+<br/>
+웹앱 개발자의 사고방식은 `Object`인데 SQL은 여전히 `Table`에 머문다. 이게 첫째, 근본적인 문제고, SQL문을 새로이 학습하여 이게 맞나? 매순간 씨름해야 하는 순간도 여전히 문턱으로 남아 있다. 이 간극을 좁히려 한 것이 바로 ORM다. 그럼 기존 ORM는 뭐가 문제였지?
+<Img src='/images/2022/autumm/스샷_프리즈마2.webp' />
+<figcaption>Prisma vs Others</figcaption>
+<br/>
+이 부분은 내가 노력해도 잘 이해가 가지 않는다.. 코드적으로는 도통 이해가 안 가는데   
+기존 ORM들이 Object인 척 노력했지만, 관계를 열 때 쓰이는 건 결국 `dot notation`이 아닌 `JOIN`이었다고. 그리고 이 맵핑 과정은 필시 막대한 성능 저하를 초래했다고 한다..❓  
+<br/>
+프리즈마는 당연히 이 지점을 극복하거나 피하려고 했을 테다. 근데 이러다가는 이해가 아니라 번역에 그치고 말 테니 실례를 직접 본 다음, 마지막에 정리를 해보는 게 나을 듯싶다.
+<br/>
+
+### 셋업
+일단 설치부터 했다.
+
+```zsh install
+$ yarn add @prsima/client
+$ yarn add -D prisma
+  or
+$ pnpm i @prsima/client
+$ pnpm i -D prisma
+```
+<br/>
+설치가 끝나고 init을 해줬는데,
+```zsh
+$ npx prisma init
+```
+이 명령어는
+- `.env` 파일을 root 폴더에 생성한다.
+- 마찬가지로 `prisma` 폴더가 root 폴더에 생성되고, 그 안에는 모델이 그려질 핵심 파일인 `schema.prisma`가 만들어진다.  
+
+> 💍 차차 볼 프리즈마의 명령들(generate, migrate)은 이 기본 경로에 움직임이 맞춰져 있었다.  
+> <q>prisma public src</q> 순으로 말끔히 순서가 떨어져 나는 그대로 썼는데,  
+> 그게 아니라면 이런 식으로 <q>--schema=</q>를 달아 경로를 일일이 알려주면 된다.
+```
+yarn prisma generate --schema=./src/prisma/schema.prisma
+```
+<br/>
+### schema 파일
+1. 모델링에 앞서 db 연결부터 했다.
+```prisma schema.prisma focus=1:4
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+```
+- `provider`에는 사용하고 있는 db를,  
+- `.env` 파일에는 내 db의 `connection url`를 알려준다.  
+<br/>
+`connection url`의 경우 DB마다 정해진 포맷이 다르다. 사용하는 웹서버에서 `url` 전체나 `endpoint`를 제공해줄 텐데 그때그때 맞춰 쓰면 되겠다.  
+<br/>
+🧨 <q>psql</q>과 <q>mongodb</q>의 포맷 예시  
+  ```js .env
+  // 하이라이트를 위해 쌍따옴표를 쳤음
+  // psql
+  DATABASE_URL = "postgres://YourUserName:YourPassword@YourHostname:Port/YourDatabaseName;"
+
+  // mongodb
+  DATABASE_URL = "mongodb+srv://YourUserName:YourPassword@..."
+  ```
+<br/>
+2. **_모델링_**  
+연결을 마친 뒤엔 데이터 모델들을 정의해준다. 이 쿼리 형태의 모델들은  
+   - DB에서 `Table`(RDBS) 또는 `Collection`(NoSQL)으로 맵핑된다.
+   - 그큐엘의 `typeDefs`처럼, `Prisma Client`에서 쿼리 API로 사용될 것이다.
+   <br/>
+데이터 모델을 짜는 데는 다양한 명령어가 개입하고 있었다. 여기서 쫄리는 사람 많을 거 같다. 내가 그랬으니까ㅎ 가령 `@map, @@map`은 스키마 파일과 DB의 대소문자 불균형 문제를 해결하는 데 쓰인다고 하고, 관계형 같은 경우 `@relation(fields:[필드명], refrerences: [참조값])`의 형태로 사용되고 있었다.  
+세부사항은 <Lnk text='공홈' href='https://www.prisma.io/docs/concepts/components/prisma-schema/relations' />에서 정독해보는 게 낫다.! 언제나 공홈부터!!
+
+```prisma schema.prisma focus=10:50
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://janedoe:janedoe@localhost:5432/hello-prisma"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id      Int      @id @default(autoincrement())
+  email   String   @unique
+  name    String?
+  role    Role     @default(USER)
+  posts   Post[]
+  profile Profile?
+}
+
+model Profile {
+  id     Int    @id @default(autoincrement())
+  bio    String
+  user   User   @relation(fields: [userId], references: [id])
+  userId Int    @unique
+}
+
+model Post {
+  id         Int        @id @default(autoincrement())
+  createdAt  DateTime   @default(now())
+  title      String
+  published  Boolean    @default(false)
+  author     User       @relation(fields: [authorId], references: [id])
+  authorId   Int
+  categories Category[] @relation(references: [id])
+}
+
+model Category {
+  id    Int    @id @default(autoincrement())
+  name  String
+  posts Post[] @relation(references: [id])
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+```
+<br/>
+### Prisma Client
+끝낸 모델링을 이제 연결해둔 DB에 반영하는 일만 남았다. 엄밀히 말해 `client`에 속하는 건 `generate` 단계지만, 결국 그 빌드업을 위해 `migrate` 하는 거니 같이 놓고 이해했다.
+- `Prisma migrate`: `schema.prisma` 파일의 모델을 DB의 테이블로 옮겨 심는다.
+- `Prisma introspect`: `migrate`의 반대. DB에서 만든 테이블을 가져와 `prisma.schema` 파일을 업데이트한다.
+- *`Prisma generate`*: `CRUD` 작업을 수행하기 위한 API를 생성한다. 기반은 앞서 말했듯 schema 파일의 모델 쿼리다. 이 명령어로 <Lnk text='쿼리 엔진' href='https://www.prisma.io/docs/concepts/components/prisma-engines/query-engine' />이 `node_modules/.prisma/client`에 다운로드 되는데, 그래서인지 PnP 방식으로 하면 오류가 뜬다. 고생했는데 해결하지 못했음.. 결국 PnP 방식을 끄고 있다.  
+`schema.prisma` 파일에 변경이 있을 때마다 `generate` 명령을 다시 수행해줘야 한다.
+<br/>
+---
+<br/>
+이제 셋팅이 끝났다. 프리즈마를 매개로 클라이언트의 `CRUD` 요청을 쉽게 DB로 보낼 수 있게 됐다.  
+<br/>
+사실 깊은 이해, 그러니까 이전 ORM들과의 차이를 알기 위해서는 `Query-engine`을 뜯어봐야 될 거 같은데, 그러자니 뭔가 역량도 시간도 부족하다.. 소인 결국 이 포스트는 실패로 마감합니다..
+<Img src='/images/2022/autumm/스샷_프리즈마4.png' />
+<br/>
+다음에는 그큐엘 서버에 `Prisma`를 심어, `resolvers`의 context 안에서 `Prisma Client API`가 실제로 활용되는 법에 대해 포스트 해야겠다. 
+
+<br/>
+---
+<br/>
+#### 참고한 사이트
+1. <Lnk text='프리즈마를 쓰는 이유' href='https://www.prisma.io/docs/concepts/overview/why-prisma' />
+2. <Lnk text='프리즈마는 ORM인가요?' href='https://www.prisma.io/docs/concepts/overview/prisma-in-your-stack/is-prisma-an-orm' />
+3. <Lnk text='Prisma & MySQL 시작하기 - 아이엠하영의 브이로그' href='https://velog.io/@iamhayoung/prisma-schema' />

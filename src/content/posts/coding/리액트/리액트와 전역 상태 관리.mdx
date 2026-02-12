@@ -1,0 +1,136 @@
+---
+title: 리액트와 전역 상태 관리
+date: '2024-05-05'
+tags:
+  - 리액트
+categories: coding
+description: study
+---
+<HeadingNavigator />
+> <figcaption>\<모던 리액트 Deep Dive\>를 공부한 내용입니다.</figcaption>
+
+### 전역 상태관리
+useState/useReducer 훅을 사용한 상태관리의 한계는 컴포넌트 간의 상태 공유가 어렵다는 점이다. 컴퍼넌트 별로 훅을 사용할 때마다 다른 클로저를 가지기 때문에 상태를 공유하기 위해서는 상위 컴퍼넌트로 상태를 끌어올려야 한다. 하지만 이 경우 상태값과 세터를 일일이 프롭스로 내려줘야 하고, 자칫하면 프롤 드릴링이 길게 이어질 수도 있어 좋은 선택이라고 할 수 없다.
+
+### 직접 구현하기
+리액트에서 상태가 업데이트되고 이를 컴퍼넌트에 반영하기 위해서는 반드시 리렌더링이 필요하다. 컴퍼넌트가 독립적으로 리렌더링을 트리거하기 위해서는 useState/useReducer의 두번째 반환값을 호출해야 한다. 이를 기반으로 조건을 작성하면
+1. 컴퍼넌트 외부 어딘가에서 상태를 사용/저장한다.
+2. 상태를 업데이트하고자 할 때는 상태를 업데이트하고 리렌더링을 유발하는 함수를 호출한다.
+3. 상태값이 객체인 경우 내가 감지하지 않는 값이 변한다면 그 리렌더링은 막는다.
+
+통상 1번의 공간이 되는 스코프를 스토어라고 칭한다. 2번의 조건을 충족시키기 위해서는 스토어의 값이 변경됐음을 알리는 콜백(setState)을 받아 구독한다. 즉 스토어 자체의 업데이트와 함께 setState를 호출하게 한다.
+
+타입을 먼저 구현하면 이런 형태가 될 것이다.
+```ts store.ts
+type Initializer<T> = T extends any ? T | ((state: T) => T)  : never;
+type Store<State> = {
+  get: () => State   // 항상 최신값을 가져와야 해서 함수 호출로 값을 받는다
+  set: (action: Initializer<State>) => void // setState처럼 값이나 함수 리턴을 받는다
+  subscribe: (callback: () => void) => ()=> void
+};
+```
+
+그러면 실질적인 스토어 공간을 만들어보자. 스토어는 함수로 만들어지고, 내부 변수인 상태는 get, set, subscribe 메서드를 통해 읽고 수정하게 된다. 이는 클로저를 활용하는 기초적인 모듈의 형태다.
+```ts store.ts
+export function createStore<State extends unknown>(initialState: Initializer<State>): Store<State>{
+  // 스토어 내부에서 관리할 변수의 초기값 선언
+  let state = typeof initialState === 'function' ? initialState() : initialState;
+
+  // 콜백은 유일한 값을 저장하기 위해 set으로 선언
+  const callbacks = new Set<() => void>();
+
+  // 언제나 최신값을 반환하는 getter
+  const get = () => state;
+
+  const set = (newState: State | ((prevState: State) => State)) => {
+    // setter 역시 함수와 값을 받아 업데이트 되게 처리
+    state = typeof newState === 'function' ? (newState as (prevState: State) => State)(state) : newState;
+
+    // 업데이트를 감지할 수 있는 콜백 실행
+    callbacks.forEach(cb => cb());
+  }
+
+  // 콜백을 추가하고 삭제하는 함수. useEffect에서 사용할 것이다
+  const subscribe = (callback: () => void) => {
+    callbacks.add(callback);
+
+    return () => {
+      callbacks.delete(callback);
+    }
+  }
+
+  return { get, set, subscribe };
+}
+```
+
+스토어를 만들었으니 이제 커스텀 훅을 만들어 리렌더링 기능을 엮는다.
+
+```ts useStore.ts
+export function useStore<State extends unknown>(store: Store<State>){
+  // store의 값을 가져와서 useState에 묶는다
+  const [state, setState] = useState(() => store.get());
+
+  useEffect(() => {
+    const unsub = store.subscribe(() => {
+      setState(store.get());
+    });
+
+    return unsub;
+  }, [store]);
+
+  return [state, store.set] as const;
+}
+```
+
+코드를 살펴보면 먼저 `createStore`로 만들어진 스토어를 인수로 넘겨준다. 그러면 내부 로직에 의해 store.get이 useState의 초기값으로 들어간다. useEffect로는 subscribe를 통해 리렌더링을 트리거할 수 있는 setState 함수를 넘겨준다. 이는 스토어의 set 함수가 호출될 때 실행되고, 때문에 스토어의 `set` 함수를 사용하여 setState의 효과를 만들어내게 된다.
+
+이로써 스토어 내부의 상태를 useState의 상태와 연동시킨 작업을 끝마쳤다. 그러나 아직 완벽한 것은 아니다. 스토어의 상태가 객체값으로 저장되는 경우라면, 객체값의 일부만 변경되더라도 리렌더링이 일어날 것이다. 따라서 이 객체에서 내가 사용하고 있는 값이 변했을 때만 리렌더링이 일어나도록 로직을 추가한다.
+
+```ts useStore.ts
+export function useStoreSelector<State extends unknown, Value extends State[keyof State]>(store: Store<State>, selector: ((state: State) => Value)){
+  // store의 값을 가져와서 useState에 묶는다
+  const [state, setState] = useState(() => selector(store.get()));
+
+  useEffect(() => {
+    const unsub = store.subscribe(() => {
+      const value = selector(store.get());
+      setState(value);
+    });
+
+    return unsub;
+  }, [store, selector]);
+
+  return [state, store.set] as const;
+}
+```
+
+바뀐 부분에선 두번째 인자로 selector를 받는다. selector는 객체 상태를 주입받아 특정 키에 대한 값을 반환한다. 반환된 값은 useState와 setState에 넘겨주는 값으로 사용한다. 그러면 객체의 다른 값이 변경되어도 리렌더링이 일어나지 않게 할 수 있다.
+
+> <label className='red'/>
+> 주의할 점은 selector를 주입할 때 useCallback을 이용해 함수 참조를 고정시켜야 한다는 것이다. 그렇지 않으면 컴퍼넌트가 리렌더링될 때마다 함수가 재생성되어 subscribe를 반복적으로 호출하게 된다(useEffect에 의존성으로 걸려 있기 때문).
+
+
+<br/>
+<br/>
+---
+
+### 리덕스의 단점
+보일러 플레이트가 너무 많다. 어떤 액션을 사용할지 타입을 선언하고, 이 액션에서 수행하는 메서드를 일일이 작성하고, 리듀서에 연결하는 일이 필요했다. 이게 flux 패턴의 정수라고는 하지만 장황한 코드를 보면 쉽게 질려버린다. 말하자면 useState를 사용해도 될 곳에서 일일이 useReducer를 사용했을 때의 답답함 같달까. 리액트 툴킷에서 이런 부담이 완화됐다고는 하지만 다양한 상태관리 라이브러리들이 많이 등장했고, 각광받는 시점에서 리덕스의 경험은 나에겐 부정적으로 남았다.
+
+### Context API
+리액트에서 제공하는 컨텍스트 API는 프롭 드릴링을 피하기 위해 생긴 API다. 이는 번거롭게 이어지는 프롭 내려주기를 방지하는 데 목적이 있다. 즉 상태 관리라기보단 상태 주입을 도와주는 기능으로 봐야 한다.
+
+### fetch 데이터를 관리하고자 할 때
+React Query와 SWR은 외부 데이터를 fetch하고 이를 관리하는 데 특화된 라이브러리다. HTTP 요청한 데이터를 메모리에 캐싱하여 재사용한다. 요청에 사용했던 키를 훅으로 넘기면 다른 컴퍼넌트에서도 저장된 캐시값을 참조하여 서버 요청을 줄인다.
+
+### 범용적인 상태관리
+Recoil과 Zustand가 대표적이다. 페이스북의 Recoil을 필두로 Jotai 등이 한쪽 조류를 맡는다. 리덕스의 결을 따라서는 Zustand가 위치한다. Recoil 쪽은 Context와 Provdier를 이용해 스토어 상태를 관리하고, Zustand는 리덕스처럼 하나의 큰 스토어 클로저를 기반해 상태를 관리한다.
+
+이런 차이가 있지만 이들 모두 작은 훅을 활용해 상태를 관리한다는 점에서 리덕스의 복잡함을 피하고 있다. 때문에 훅이 등장한 리액트 16.8 버전을 의존성으로 요구한다. 이는 개발자가 원하는 만큼의 상태를 지역적으로 관리하는 것을 가능하게 만들었고, 훅을 사용함으로써 함수형 컴퍼넌트에서 쉽게 사용할 수 있다는 장점 또한 가지고 있다.
+
+
+
+<br/>
+<br/>
+---
+슈스탄드와 리코일/조타이는 실제 프로젝트에서 사용한 뒤 따로 느낀 점을 기술할 예정이다.

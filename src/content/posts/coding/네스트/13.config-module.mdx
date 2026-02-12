@@ -1,0 +1,86 @@
+---
+title: Config Module
+date: "2023-11-28"
+categories: coding
+tags: "네스트"
+description: "13"
+---
+
+<HeadingNavigator />
+
+### 환경변수 설정
+```ts app.module.ts
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      envFilePath: '.env',
+      isGlobal: true,
+    }),
+  ],
+  ...
+})
+
+export class AppModule {}
+```
+- import 안에 ConfigModule.forRoot()을 불러온다.
+- env 파일의 경로, 파일명을 등록한다.
+- isGlobal: true로 설정하면 전역적으로 적용된다. 모듈마다 등록하는 번거로움을 줄여준다.
+
+### 사용하는 법
+```ts posts.service.ts
+@Injectable()
+export class PostsService {
+  constructor(
+    @InjectRepository(PostModel)
+    private readonly postsRepository: Repository<PostModel>,
+    private readonly commonService: CommonService<PostModel>,
+    // mark
+    private readonly configService: ConfigService,
+  ) {}
+
+  const PROTOCOL = this.configService.get<string>('PROTOCOL');
+  const HOST = this.configService.get<string>('HOST');
+  const nextUrl = lastItem && new URL(`${PROTOCOL}://${HOST}/posts`);
+}
+```
+1. configService
+- config도 의존성으로 주입받는 서비스다.
+- `configService.get()`으로 env 파일에 등록한 변수를 가져올 수 있다.
+- get에 들어갈 키값을 상수 or Enum으로 모아두는 것도 실수를 줄이고 관리를 용이하게 하는 방법이다.
+  ```ts env.const.ts
+  export const ENV_KEYS = {
+    protocol: 'PROTOCOL',
+    host: 'HOST',
+    jwt_secret: 'JWT_SECRET',
+    hash_round: 'HASH_ROUND',
+    db_host: 'DB_HOST',
+    db_port: 'DB_PORT',
+    db_username: 'DB_USERNAME',
+    db_password: 'DB_PASSWORD',
+    db_database: 'DB_DATABASE',
+  };
+  ```
+
+2. process.env
+- `app.module.ts`에서는 configService를 주입받을 수 없다.
+- 따라서 `app.module.ts`에서 환경변수를 이용할 땐 `process.env`를 사용한다.
+  ```ts app.module.ts
+   TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: process.env[ENV_KEYS.db_host],
+      port: +process.env[ENV_KEYS.db_port],
+      username: process.env[ENV_KEYS.db_username],
+      password: process.env[ENV_KEYS.db_password],
+      database: process.env[ENV_KEYS.db_database],
+      synchronize: true,
+      entities: [
+        PostModel,
+        UserModel,
+        ...
+      ],
+    }),
+  ```
+<br />
+#### 참고링크
+[^1]: <Lnk text='Active Record vs Data Mapper' href='https://typeorm.io/active-record-data-mapper' />
+[^2]: <Lnk text='Data Source Options' href='https://typeorm.io/data-source-options' />

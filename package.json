@@ -11,6 +11,7 @@
   "dependencies": {
     "@astrojs/mdx": "^4.3.13",
     "@astrojs/react": "^4.4.2",
+    "@astrojs/rss": "^4.0.15",
     "@expressive-code/plugin-line-numbers": "^0.41.6",
     "@nanostores/react": "^1.0.0",
     "@tailwindcss/vite": "^4.1.18",

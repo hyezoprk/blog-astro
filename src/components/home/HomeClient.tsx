@@ -150,7 +150,7 @@ export default function HomeClient({ allPostsData, recentPosts, initialCategory 
               <a
                 key={id}
                 href={`/posts/${id}`}
-                onMouseUp={() => tapSound()}
+                onClick={() => tapSound()}
                 onClick={() => sessionStorage.setItem('path', window.location.pathname + window.location.search)}
                 className="mb-2 flex flex-row justify-between border-slate-600/30 px-5 no-underline sm:border-y-0 sm:py-1 md:border-y md:py-2"
               >
@@ -195,7 +195,7 @@ export default function HomeClient({ allPostsData, recentPosts, initialCategory 
         </div>
 
         {/* Tag List */}
-        <article className="flex flex-row border-y border-blue-800 py-px backdrop-blur dark:border-blue-900">
+        <article className="flex flex-row border-y border-blue-800 py-2 backdrop-blur dark:border-blue-900">
           <div className="flex basis-1/12 items-center justify-center pl-3">
             <CategoryIcon category={activeCategory} />
           </div>
@@ -204,7 +204,7 @@ export default function HomeClient({ allPostsData, recentPosts, initialCategory 
               <div
                 key={tag}
                 onClick={() => tapSound()}
-                className={`relative flex justify-center px-2 pt-[3px] sm:h-40 md:h-52 ${
+                className={`relative flex justify-center px-2 pt-3 sm:h-40 md:h-52 ${
                   isSafari() ? 'word-safari tracking-wider' : 'word-tightest'
                 }`}
               >

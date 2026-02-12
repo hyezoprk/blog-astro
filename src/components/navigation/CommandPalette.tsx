@@ -132,8 +132,7 @@ function RenderResults() {
             <div className="cursor-default text-gray-500/80">{item}</div>
           ) : (
             <div
-              onMouseEnter={() => tick()}
-              onMouseUp={() => tap()}
+              onClick={() => tap()}
               className={`${
                 active
                   ? 'cursor-pointer rounded-md bg-emerald-600 text-gray-100'

@@ -22,11 +22,12 @@ export default defineConfig({
         },
       },
     }),
-    mdx({
-      remarkPlugins: [remarkGfm],
-      rehypePlugins: [rehypeSlug],
-    }),
+    mdx(),
   ],
+  markdown: {
+    remarkPlugins: [remarkGfm],
+    rehypePlugins: [rehypeSlug],
+  },
   vite: {
     plugins: [tailwindcss()],
   },

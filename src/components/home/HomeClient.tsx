@@ -150,8 +150,10 @@ export default function HomeClient({ allPostsData, recentPosts, initialCategory 
               <a
                 key={id}
                 href={`/posts/${id}`}
-                onClick={() => tapSound()}
-                onClick={() => sessionStorage.setItem('path', window.location.pathname + window.location.search)}
+                onClick={() => {
+                  tapSound();
+                  sessionStorage.setItem('path', window.location.pathname + window.location.search);
+                }}
                 className="mb-2 flex flex-row justify-between border-slate-600/30 px-5 no-underline sm:border-y-0 sm:py-1 md:border-y md:py-2"
               >
                 <div>

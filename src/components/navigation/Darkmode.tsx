@@ -28,25 +28,21 @@ export default function Darkmode() {
 
   if (!mounted) return <div className="size-6" />;
 
+  const handleToggle = () => {
+    sound();
+    toggleTheme();
+  };
+
   return (
     <button
       aria-label="Darkmode Switch"
+      onClick={handleToggle}
       className={`rounded-md transition-transform duration-300 hover:bg-gray-300/30 dark:hover:bg-zinc-800/30 md:inline ${rotate ? 'rotate-0' : 'rotate-45'}`}
     >
       {theme === 'dark' ? (
-        <MdDarkMode
-          onMouseUp={() => sound()}
-          onClick={toggleTheme}
-          className="size-6"
-          fill="gold"
-        />
+        <MdDarkMode className="size-6" fill="gold" />
       ) : (
-        <MdOutlineLightMode
-          onMouseUp={() => sound()}
-          onClick={toggleTheme}
-          className="size-6"
-          fill="orange"
-        />
+        <MdOutlineLightMode className="size-6" fill="orange" />
       )}
     </button>
   );

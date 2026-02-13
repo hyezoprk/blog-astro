@@ -7,6 +7,7 @@ import expressiveCode from 'astro-expressive-code';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { glob } from 'node:fs/promises';
 
 /** @type {import('astro').AstroIntegration} */
@@ -20,7 +21,7 @@ const ecCssToHead = {
       let ecDivCount = 0;
       for await (const file of glob('**/*.html', { cwd: dir.pathname })) {
         htmlCount++;
-        const path = dir.pathname + file;
+        const path = join(dir.pathname, file);
         const html = readFileSync(path, 'utf-8');
         if (html.includes('expressive-code')) ecDivCount++;
         const links = html.match(linkRe);

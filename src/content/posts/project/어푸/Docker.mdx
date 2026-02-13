@@ -50,7 +50,7 @@ image: /images/default/next-white.webp
 도커파일은 CI 파이프라인에서 docker build 명령이 실행될 때 이미지 생성을 위해 참조하는 파일이다. 서버를 빌드하는 명령, 이미지에서 받을 환경변수를 열어두는 작업 등이 여기에서 수행된다.
 보통 두 단계로 나누어 진행하는 거 같다. 단계를 나눴을 때 node_modules의 크기를 줄일 수 있기 때문에 그렇다.
 
-```Dockerfile
+```dockerfile
 # build stage
 FROM node:21-alpine AS build
 WORKDIR /usr/src/app

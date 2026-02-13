@@ -15,15 +15,22 @@ const ecCssToHead = {
   hooks: {
     'astro:build:done': async ({ dir }) => {
       const linkRe = /<link rel="stylesheet" href="\/_astro\/ec\.[^"]+\.css"\/>/g;
+      let htmlCount = 0;
+      let movedCount = 0;
+      let ecDivCount = 0;
       for await (const file of glob('**/*.html', { cwd: dir.pathname })) {
+        htmlCount++;
         const path = dir.pathname + file;
         const html = readFileSync(path, 'utf-8');
+        if (html.includes('expressive-code')) ecDivCount++;
         const links = html.match(linkRe);
         if (!links) continue;
+        movedCount++;
         const uniqueLink = [...new Set(links)].join('');
         const result = html.replace(linkRe, '').replace('</head>', `${uniqueLink}</head>`);
         writeFileSync(path, result);
       }
+      console.log(`[ec-css-to-head] ${htmlCount} HTML files | ${ecDivCount} with EC divs | ${movedCount} EC CSS moved`);
     },
   },
 };

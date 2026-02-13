@@ -13,7 +13,6 @@ export default defineConfig({
     react(),
     expressiveCode({
       themes: ['github-dark'],
-      emitExternalStylesheet: false,
       styleOverrides: {
         borderRadius: '0.5rem',
         codeFontFamily: 'Agave, ui-monospace, SFMono-Regular, monospace',

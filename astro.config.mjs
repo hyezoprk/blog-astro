@@ -6,35 +6,23 @@ import mdx from '@astrojs/mdx';
 import expressiveCode from 'astro-expressive-code';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
-
-function findHtmlFiles(dir) {
-  const files = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      files.push(...findHtmlFiles(full));
-    } else if (entry.endsWith('.html')) {
-      files.push(full);
-    }
-  }
-  return files;
-}
+import { readFileSync, writeFileSync } from 'node:fs';
+import { glob } from 'node:fs/promises';
 
 /** @type {import('astro').AstroIntegration} */
 const ecCssToHead = {
   name: 'ec-css-to-head',
   hooks: {
-    'astro:build:done': ({ dir }) => {
+    'astro:build:done': async ({ dir }) => {
       const linkRe = /<link rel="stylesheet" href="\/_astro\/ec\.[^"]+\.css"\/>/g;
-      for (const file of findHtmlFiles(dir.pathname)) {
-        const html = readFileSync(file, 'utf-8');
+      for await (const file of glob('**/*.html', { cwd: dir.pathname })) {
+        const path = dir.pathname + file;
+        const html = readFileSync(path, 'utf-8');
         const links = html.match(linkRe);
         if (!links) continue;
         const uniqueLink = [...new Set(links)].join('');
         const result = html.replace(linkRe, '').replace('</head>', `${uniqueLink}</head>`);
-        writeFileSync(file, result);
+        writeFileSync(path, result);
       }
     },
   },

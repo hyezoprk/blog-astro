@@ -12,7 +12,9 @@ export default defineConfig({
   integrations: [
     react(),
     expressiveCode({
-      themes: ['one-dark-pro'],
+      themes: ['github-light', 'github-dark'],
+      useDarkModeMediaQuery: false,
+      themeCssSelector: (theme) => `.${theme.type}`,
       styleOverrides: {
         borderRadius: '0.5rem',
         codeFontFamily: 'Agave, ui-monospace, SFMono-Regular, monospace',

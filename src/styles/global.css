@@ -315,6 +315,7 @@
     margin-right: 1px;
     border-radius: 0.375rem;
     background-color: var(--color-lightGray);
+    color: #1e1e1e;
     padding-left: 0.25rem;
     padding-right: 0.25rem;
     padding-top: 1px;
@@ -322,6 +323,11 @@
     vertical-align: top;
     font-family: var(--font-mono);
     font-size: var(--text-base);
+  }
+
+  .dark p code, .dark li code {
+    background-color: #3a3a3a;
+    color: #e2e8f0;
   }
 
   b {

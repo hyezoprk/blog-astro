@@ -6,11 +6,34 @@ import mdx from '@astrojs/mdx';
 import expressiveCode from 'astro-expressive-code';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { glob } from 'node:fs/promises';
+
+/** @type {import('astro').AstroIntegration} */
+const ecCssToHead = {
+  name: 'ec-css-to-head',
+  hooks: {
+    'astro:build:done': async ({ dir }) => {
+      const linkRe = /<link rel="stylesheet" href="\/_astro\/ec\.[^"]+\.css"\/>/g;
+      const files = glob('**/*.html', { cwd: dir.pathname });
+      for await (const file of files) {
+        const path = dir.pathname + file;
+        const html = readFileSync(path, 'utf-8');
+        const links = html.match(linkRe);
+        if (!links) continue;
+        const uniqueLink = [...new Set(links)].join('');
+        const result = html.replace(linkRe, '').replace('</head>', `${uniqueLink}</head>`);
+        writeFileSync(path, result);
+      }
+    },
+  },
+};
 
 // https://astro.build/config
 export default defineConfig({
   integrations: [
     react(),
+    ecCssToHead,
     expressiveCode({
       themes: ['github-dark'],
       styleOverrides: {

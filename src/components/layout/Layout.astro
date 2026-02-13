@@ -22,32 +22,32 @@ const { siteTitle, home, tag, category } = Astro.props;
     <slot name="head" />
   </head>
   <body>
-    <CommandPalette client:load>
-      <div class="h-auto min-h-screen w-full dark:bg-zinc-900/90 dark:text-slate-200/80">
-        <FlyingLogo client:load />
-        <div class={`container mx-auto ${home ? 'max-w-4xl' : category === 'reading' ? 'max-w-xl' : 'max-w-3xl'}`}>
-          <header>
-            <Nav />
-          </header>
+    <CommandPalette client:load />
 
-          <section class="pt-10">
-            <article>
-              <slot />
-            </article>
+    <div class="h-auto min-h-screen w-full dark:bg-zinc-900/90 dark:text-slate-200/80">
+      <FlyingLogo client:load />
+      <div class={`container mx-auto ${home ? 'max-w-4xl' : category === 'reading' ? 'max-w-xl' : 'max-w-3xl'}`}>
+        <header>
+          <Nav />
+        </header>
 
-            {tag ? (
-              <footer class="ml-3 mt-16 pb-20 text-base">
-                <a href="/" class="no-underline" id="prev-link-tag">← Previous</a>
-              </footer>
-            ) : !home && (
-              <footer class="ml-3 mt-16 pb-20 text-base">
-                <a href="/" class="select-none no-underline" id="prev-link">← Previous</a>
-              </footer>
-            )}
-          </section>
-        </div>
+        <section class="pt-10">
+          <article>
+            <slot />
+          </article>
+
+          {tag ? (
+            <footer class="ml-3 mt-16 pb-20 text-base">
+              <a href="/" class="no-underline" id="prev-link-tag">← Previous</a>
+            </footer>
+          ) : !home && (
+            <footer class="ml-3 mt-16 pb-20 text-base">
+              <a href="/" class="select-none no-underline" id="prev-link">← Previous</a>
+            </footer>
+          )}
+        </section>
       </div>
-    </CommandPalette>
+    </div>
 
     <script>
       const tagLink = document.getElementById('prev-link-tag');

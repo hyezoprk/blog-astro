@@ -14,11 +14,7 @@ import { IoCloud } from 'react-icons/io5';
 import { GiCircle } from 'react-icons/gi';
 import useSound from 'use-sound';
 
-interface Props {
-  children: React.ReactNode;
-}
-
-export default function CommandPalette({ children }: Props) {
+export default function CommandPalette() {
   const navigate = (path: string) => {
     window.location.href = path;
   };
@@ -113,7 +109,6 @@ export default function CommandPalette({ children }: Props) {
           </KBarAnimator>
         </KBarPositioner>
       </KBarPortal>
-      {children}
     </KBarProvider>
   );
 }

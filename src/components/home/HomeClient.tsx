@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo } from 'react';
 const TWEMOJI = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/';
 const CATEGORY_EMOJI: Record<string, string> = {
-  essays: '1f4da',   // 📚
+  essays: '1f345',   // 🍅
   swimming: '1fae7', // 🫧
   chips: '1f9e9',    // 🧩
 };

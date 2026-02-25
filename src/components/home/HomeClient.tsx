@@ -5,7 +5,17 @@
  * - RecentPosts 토글
  */
 import { useState, useEffect, useMemo } from 'react';
-import { FcDislike, FcPuzzle, FcWorkflow } from 'react-icons/fc';
+const TWEMOJI = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/';
+const CATEGORY_EMOJI: Record<string, string> = {
+  essays: '1f4dd',   // 📝
+  swimming: '1f97d', // 🥽
+  chips: '1f9e9',    // 🧩
+};
+
+function CategoryIcon({ category, className }: { category: string; className: string }) {
+  const code = CATEGORY_EMOJI[category] ?? '1f4dd';
+  return <img src={`${TWEMOJI}${code}.svg`} alt={category} className={className} />;
+}
 import { BsChevronDown } from 'react-icons/bs';
 import useSound from 'use-sound';
 
@@ -37,11 +47,6 @@ function isSafari() {
   );
 }
 
-function CategoryIcon({ category }: { category: string }) {
-  if (category === 'swimming') return <FcPuzzle className="size-6" />;
-  if (category === 'chips') return <FcDislike className="size-6" />;
-  return <FcWorkflow className="size-6" />;
-}
 
 export default function HomeClient({ allPostsData, recentPosts, initialCategory }: Props) {
   const [activeCategory, setActiveCategory] = useState(initialCategory || 'essays');
@@ -152,15 +157,7 @@ export default function HomeClient({ allPostsData, recentPosts, initialCategory 
                 }}
                 className="mb-2 flex flex-row justify-between border-slate-600/30 px-5 no-underline sm:border-y-0 sm:py-1 md:border-y md:py-2"
               >
-                <div>
-                  {categories === 'swimming' ? (
-                    <FcPuzzle className="size-5" />
-                  ) : categories === 'chips' ? (
-                    <FcDislike className="size-5" />
-                  ) : (
-                    <FcWorkflow className="size-5" />
-                  )}
-                </div>
+                <CategoryIcon category={categories} className="size-5" />
                 <div>{title}</div>
               </a>
             ))}
@@ -195,7 +192,7 @@ export default function HomeClient({ allPostsData, recentPosts, initialCategory 
         {/* Tag List */}
         <article className="flex flex-row border-y border-blue-800 py-2 backdrop-blur dark:border-blue-900">
           <div className="flex basis-1/12 items-center justify-center pl-3">
-            <CategoryIcon category={activeCategory} />
+            <CategoryIcon category={activeCategory} className="size-6" />
           </div>
           <div className="flex basis-11/12 flex-row overflow-hidden pl-3">
             {tags.map(tag => (

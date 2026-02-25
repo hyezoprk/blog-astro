@@ -54,11 +54,7 @@ export default function HomeClient({ allPostsData, recentPosts, initialCategory 
   const [tapSound] = useSound('/sounds/tap.mp3', { volume: 0.6 });
   const [beepSound] = useSound('/sounds/beep.mp3', { volume: 0.6 });
 
-  // 카테고리 목록 (고유값)
-  const categories = useMemo(() => {
-    const cats = [...new Set(allPostsData.map(p => p.categories))].sort();
-    return cats;
-  }, [allPostsData]);
+  const categories = ['essays', 'reading', 'chips'];
 
   // 현재 카테고리 인덱스
   const categoryIndex = categories.indexOf(activeCategory);

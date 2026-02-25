@@ -21,7 +21,7 @@ export default function Profile() {
           />
           <div className="ml-8 flex flex-col justify-center space-y-1">
             <p className="pt-0 font-heading text-lg">hyezolog</p>
-            <p className="pt-0 text-base">잡기장</p>
+            <p className="pt-0 text-base">ㅎㅈ</p>
           </div>
         </section>
         <section className="mx-10 flex items-center">
@@ -32,7 +32,7 @@ export default function Profile() {
               color="orange"
               animationDuration={1000}
             >
-              이게 다예요
+              이게 다예요 🫠
             </RoughNotation>
           </p>
         </section>

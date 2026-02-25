@@ -38,7 +38,7 @@ function isSafari() {
 }
 
 function CategoryIcon({ category }: { category: string }) {
-  if (category === 'reading') return <FcPuzzle className="size-6" />;
+  if (category === 'swimming') return <FcPuzzle className="size-6" />;
   if (category === 'chips') return <FcDislike className="size-6" />;
   return <FcWorkflow className="size-6" />;
 }
@@ -54,7 +54,7 @@ export default function HomeClient({ allPostsData, recentPosts, initialCategory 
   const [tapSound] = useSound('/sounds/tap.mp3', { volume: 0.6 });
   const [beepSound] = useSound('/sounds/beep.mp3', { volume: 0.6 });
 
-  const categories = ['essays', 'reading', 'chips'];
+  const categories = ['essays', 'swimming', 'chips'];
 
   // 현재 카테고리 인덱스
   const categoryIndex = categories.indexOf(activeCategory);
@@ -153,7 +153,7 @@ export default function HomeClient({ allPostsData, recentPosts, initialCategory 
                 className="mb-2 flex flex-row justify-between border-slate-600/30 px-5 no-underline sm:border-y-0 sm:py-1 md:border-y md:py-2"
               >
                 <div>
-                  {categories === 'reading' ? (
+                  {categories === 'swimming' ? (
                     <FcPuzzle className="size-5" />
                   ) : categories === 'chips' ? (
                     <FcDislike className="size-5" />

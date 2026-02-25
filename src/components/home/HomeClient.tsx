@@ -38,13 +38,13 @@ function isSafari() {
 }
 
 function CategoryIcon({ category }: { category: string }) {
-  if (category === 'project') return <FcDislike className="size-6" />;
   if (category === 'reading') return <FcPuzzle className="size-6" />;
+  if (category === 'chips') return <FcDislike className="size-6" />;
   return <FcWorkflow className="size-6" />;
 }
 
 export default function HomeClient({ allPostsData, recentPosts, initialCategory }: Props) {
-  const [activeCategory, setActiveCategory] = useState(initialCategory || 'coding');
+  const [activeCategory, setActiveCategory] = useState(initialCategory || 'essays');
   const [tabTranslate, setTabTranslate] = useState('0%');
   const [recentOpen, setRecentOpen] = useState(true);
   const [recentAnimation, setRecentAnimation] = useState(false);
@@ -80,7 +80,7 @@ export default function HomeClient({ allPostsData, recentPosts, initialCategory 
 
     // URL에서 category 파라미터 읽기
     const params = new URLSearchParams(window.location.search);
-    const cat = params.get('category') || 'coding';
+    const cat = params.get('category') || 'essays';
     setActiveCategory(cat);
 
     // sessionStorage에서 탭 위치 복원
@@ -157,12 +157,12 @@ export default function HomeClient({ allPostsData, recentPosts, initialCategory 
                 className="mb-2 flex flex-row justify-between border-slate-600/30 px-5 no-underline sm:border-y-0 sm:py-1 md:border-y md:py-2"
               >
                 <div>
-                  {categories === 'coding' ? (
-                    <FcWorkflow className="size-5" />
-                  ) : categories === 'project' ? (
+                  {categories === 'reading' ? (
+                    <FcPuzzle className="size-5" />
+                  ) : categories === 'chips' ? (
                     <FcDislike className="size-5" />
                   ) : (
-                    <FcPuzzle className="size-5" />
+                    <FcWorkflow className="size-5" />
                   )}
                 </div>
                 <div>{title}</div>

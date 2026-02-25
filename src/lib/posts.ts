@@ -22,6 +22,25 @@ export async function getPinnedPosts() {
   return posts.filter(post => post.data.pinned);
 }
 
+export async function getRecentPosts() {
+  const posts = await getAllPosts();
+  const threeWeeksAgo = new Date();
+  threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
+  const cutoff = threeWeeksAgo.toISOString().slice(0, 10);
+  const seen = new Set<string>();
+  const result: typeof posts = [];
+  for (const post of posts) {
+    if (post.data.pinned || post.data.date >= cutoff) {
+      if (!seen.has(post.id)) {
+        seen.add(post.id);
+        result.push(post);
+      }
+    }
+    if (result.length >= 10) break;
+  }
+  return result;
+}
+
 export async function getAllTags() {
   const posts = await getAllPosts();
   const tagSet = new Set<string>();

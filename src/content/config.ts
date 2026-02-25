@@ -5,7 +5,7 @@ const posts = defineCollection({
   schema: z.object({
     title: z.string(),
     date: z.string(),
-    categories: z.enum(['coding', 'project', 'reading']),
+    categories: z.enum(['essays', 'reading', 'chips']),
     tags: z.union([z.string(), z.array(z.string())]).default('쪼가리'),
     description: z.union([z.string(), z.number()]).transform(v => String(v)).optional(),
     excerpt: z.union([z.string(), z.number()]).transform(v => String(v)).optional(),

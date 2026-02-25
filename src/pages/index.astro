@@ -2,11 +2,11 @@
 import Layout from '../components/layout/Layout.astro';
 import Profile from '../components/home/Profile';
 import HomeClient from '../components/home/HomeClient';
-import { getAllPosts, getPinnedPosts } from '../lib/posts';
+import { getAllPosts, getRecentPosts } from '../lib/posts';
 import '../styles/global.css';
 
 const allPosts = await getAllPosts();
-const pinnedPosts = await getPinnedPosts();
+const pinnedPosts = await getRecentPosts();
 
 const allPostsData = allPosts.map(p => ({
   id: p.id.replace(/\.mdx?$/, '').split('/').pop() ?? p.id,

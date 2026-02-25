@@ -21,22 +21,19 @@ export default function Profile() {
           />
           <div className="ml-8 flex flex-col justify-center space-y-1">
             <p className="pt-0 font-heading text-lg">hyezolog</p>
-            <p className="pt-0 text-base">공부일지</p>
+            <p className="pt-0 text-base">잡기장</p>
           </div>
         </section>
         <section className="mx-10 flex items-center">
           <p className="pt-0 font-content text-base sm:leading-6 md:leading-7">
-            안녕하세요. 처절한 코딩 생존기를 담은 사이트입니다.
-            <br />
             <RoughNotation
               show={show}
               type="underline"
               color="orange"
               animationDuration={1000}
             >
-              코딩과 일기
+              이게 다예요
             </RoughNotation>
-            가 뒤죽박죽 섞여 있어요 😵‍💫
           </p>
         </section>
       </div>

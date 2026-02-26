@@ -6,7 +6,7 @@ export async function GET() {
 
   return rss({
     title: '혜조로그',
-    description: '코딩과 일기가 뒤죽박죽 섞여 있어요',
+    description: '이게 다예요 🫠',
     site: 'https://hyezoprk.vercel.app',
     items: posts.map(post => ({
       title: post.data.title,

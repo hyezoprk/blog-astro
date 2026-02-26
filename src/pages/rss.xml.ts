@@ -14,6 +14,6 @@ export async function GET() {
       description: post.data.description ?? '',
       link: `/posts/${post.id.replace(/\.mdx?$/, '').split('/').pop() ?? post.id}`,
     })),
-    customData: `<language>ko-KR</language><image><url>https://hyezoprk.vercel.app/images/2022/summer/heart.ico</url><title>혜조로그</title><link>https://hyezoprk.vercel.app</link></image>`,
+    customData: `<language>ko-KR</language><image><url>https://hyezoprk.vercel.app/images/2022/summer/heart.png</url><title>혜조로그</title><link>https://hyezoprk.vercel.app</link></image>`,
   });
 }

@@ -31,5 +31,8 @@
     "remark-gfm": "^4.0.1",
     "tailwindcss": "^4.1.18",
     "use-sound": "^5.0.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.5"
   }
 }

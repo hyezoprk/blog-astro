@@ -14,7 +14,8 @@ export async function GET() {
       pubDate: new Date(post.data.date),
       description: post.data.description ?? '',
       link: `/posts/${post.id.replace(/\.mdx?$/, '').split('/').pop() ?? post.id}`,
+      author: 'ㅎㅈ',
     })),
-    customData: `<language>ko-KR</language><image><url>https://hyezoprk.vercel.app/images/2022/summer/heart.png</url><title>혜조로그</title><link>https://hyezoprk.vercel.app</link></image><webfeeds:icon>https://hyezoprk.vercel.app/images/2022/summer/heart.png</webfeeds:icon>`,
+    customData: `<language>ko-KR</language><managingEditor>ㅎㅈ</managingEditor><image><url>https://hyezoprk.vercel.app/images/2022/summer/heart.png</url><title>혜조로그</title><link>https://hyezoprk.vercel.app</link></image><webfeeds:icon>https://hyezoprk.vercel.app/images/2022/summer/heart.png</webfeeds:icon>`,
   });
 }
